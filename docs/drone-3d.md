@@ -11,22 +11,29 @@ padrão do ecossistema e casa com React 19.
 
 ## Desacoplamento
 
-A cena **não conhece o backend**. A única entrada é uma booleana:
+A cena **não conhece o backend**. A única entrada de estado é uma booleana:
 
 ```tsx
-<DroneViewer isFlying={summary.data?.flight_connection.connected ?? false} />
+<DroneViewer isFlying={connected} />
 ```
 
 ```mermaid
 flowchart LR
     be["Backend<br/>connected = true"] --> q["TanStack Query"]
     q --> page["DashboardPage"]
-    page -->|isFlying| v["DroneViewer"]
+    page --> fp["FlightPanel"]
+    fp -->|isFlying| v["DroneViewer"]
     v --> m["DroneModel / DronePlaceholder"]
     m --> anim["Animação"]
 ```
 
 Isso mantém a cena testável isoladamente e reusável em qualquer outra tela.
+
+No Dashboard quem monta o `DroneViewer` é o `FlightPanel`, que decide quando a
+cena dá lugar ao mapa — ver [Voo e coleta](flight.md#painel-de-voo-do-dashboard).
+Ele passa também um `label` opcional, para que o painel possa dizer
+`DECOLANDO` entre `EM SOLO` e `EM VOO`. É texto, não dado: nada em `drone3d/`
+importa hook, service ou tipo da API.
 
 ## Comportamento
 

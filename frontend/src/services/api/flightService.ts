@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { CollectionSession, FlightStatus, PipelineState } from "@/types/api";
+import type { CollectionSession, FlightStatus, PipelineState, Telemetry } from "@/types/api";
 
 /**
  * Voo, coleta e pipeline.
@@ -13,6 +13,14 @@ export const flightService = {
 
   setEndpoint: (endpoint: string) =>
     api.put<FlightStatus>("/flight/endpoint", { endpoint }).then((r) => r.data),
+
+  /**
+   * Última posição conhecida, para o mapa se posicionar na montagem. Daí em
+   * diante quem alimenta a tela é o evento SSE — isto não vira polling.
+   * `204` significa que a fonte de voo ainda não produziu amostra alguma.
+   */
+  getTelemetry: (): Promise<Telemetry | null> =>
+    api.get<Telemetry>("/flight/telemetry").then((r) => (r.status === 204 ? null : r.data)),
 
   getCurrentCollection: () =>
     api.get<CollectionSession | null>("/flight/collection/current").then((r) => r.data),

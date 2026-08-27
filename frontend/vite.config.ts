@@ -21,6 +21,9 @@ export default defineConfig({
         manualChunks: {
           three: ["three", "@react-three/fiber", "@react-three/drei"],
           charts: ["recharts"],
+          // O mapa só é baixado quando o painel troca para ele; em chunk
+          // próprio isso continua valendo depois do build.
+          map: ["leaflet", "react-leaflet"],
         },
       },
     },

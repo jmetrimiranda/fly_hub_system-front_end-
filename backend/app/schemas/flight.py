@@ -1,6 +1,7 @@
 """Schemas do domínio Voo: conexão, telemetria, coleta e pipeline."""
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -46,6 +47,24 @@ class FlightStatus(ApiModel):
     indicators: FlightIndicators
     metrics: ConnectionMetrics
     last_seen_at: datetime | None = None
+
+
+class Telemetry(ApiModel):
+    """Uma amostra de posição da aeronave.
+
+    Espelha o dataclass de `integrations/flight_source/base.py`. É o payload do
+    evento SSE `flight.telemetry`, que — exceção registrada no ADR 006 — carrega
+    o dado em vez de só avisar que ele mudou.
+    """
+
+    at: datetime
+    latitude: float
+    longitude: float
+    altitude_m: float = Field(description="Relativa ao ponto de decolagem")
+    heading_deg: float = Field(ge=0, lt=360, description="0 = norte, sentido horário")
+    horizontal_speed_ms: float
+    satellites: int
+    fix_type: Literal["none", "gps", "rtk"]
 
 
 class EndpointUpdate(BaseModel):

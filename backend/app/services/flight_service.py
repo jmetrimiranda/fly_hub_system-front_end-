@@ -8,17 +8,30 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.events import bus
 from app.core.logging import get_logger
+from app.integrations.flight_source import FlightSource, get_flight_source
 from app.integrations.flyhub.client import FlyHubClient
 from app.models.flight import FlightConnection
-from app.schemas.flight import ConnectionMetrics, EndpointUpdate, FlightIndicators, FlightStatus
+from app.schemas.flight import (
+    ConnectionMetrics,
+    EndpointUpdate,
+    FlightIndicators,
+    FlightStatus,
+    Telemetry,
+)
 
 log = get_logger(__name__)
 
 
 class FlightService:
-    def __init__(self, session: AsyncSession, client: FlyHubClient | None = None) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        client: FlyHubClient | None = None,
+        source: FlightSource | None = None,
+    ) -> None:
         self._session = session
         self._client = client or FlyHubClient()
+        self._source = source or get_flight_source()
 
     async def _connection(self) -> FlightConnection:
         result = await self._session.execute(select(FlightConnection).limit(1))
@@ -72,6 +85,15 @@ class FlightService:
             ),
             last_seen_at=connection.last_seen_at,
         )
+
+    async def telemetry(self) -> Telemetry | None:
+        """Última amostra conhecida, ou `None` se a fonte ainda não produziu uma.
+
+        O mapa chama isto na montagem para se posicionar sem esperar o próximo
+        tick; daí em diante ele vive do evento SSE.
+        """
+        sample = await self._source.current()
+        return Telemetry.model_validate(sample) if sample else None
 
     async def update_endpoint(self, payload: EndpointUpdate) -> FlightStatus:
         """Grava o endereço informado pelo operador. Quem conecta é o backend."""

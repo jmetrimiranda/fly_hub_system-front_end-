@@ -4,7 +4,7 @@ import { StatCard } from "@/components/ui/StatCard";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart";
-import { DroneViewer } from "@/components/drone3d/DroneViewer";
+import { FlightPanel } from "@/components/flightpanel/FlightPanel";
 import { useDamageSeries, useDashboardSummary, useRecentInspections } from "@/hooks/useDashboard";
 import { formatDate, formatDuration, formatNumber } from "@/lib/format";
 
@@ -107,10 +107,10 @@ export function DashboardPage() {
         </SurfaceCard>
       </GridItem>
 
-      {/* Coluna direita: o drone acompanha o estado real da conexão */}
+      {/* Coluna direita: drone em solo, decolagem e, em voo estável, o mapa */}
       <GridItem>
         <Box height={{ base: "320px", xl: "100%" }} minH="320px">
-          <DroneViewer isFlying={connected} />
+          <FlightPanel connected={connected} />
         </Box>
       </GridItem>
 

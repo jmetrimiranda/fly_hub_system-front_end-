@@ -67,6 +67,23 @@ export interface FlightStatus {
   last_seen_at: string | null;
 }
 
+/**
+ * Uma amostra de posição. Chega pelo evento SSE `flight.telemetry`, que — única
+ * exceção ao ADR 002 — carrega o dado em vez de só avisar (ver ADR 006).
+ */
+export interface Telemetry {
+  at: string;
+  latitude: number;
+  longitude: number;
+  /** Relativa ao ponto de decolagem, não ao nível do mar. */
+  altitude_m: number;
+  /** Rumo de bússola: 0 = norte, sentido horário. */
+  heading_deg: number;
+  horizontal_speed_ms: number;
+  satellites: number;
+  fix_type: "none" | "gps" | "rtk";
+}
+
 export interface CollectionSession {
   id: number;
   version: string;

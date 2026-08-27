@@ -10,8 +10,16 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { eventsUrl } from "@/services/api";
 import { keys } from "@/lib/queryKeys";
+import { emitTelemetry } from "@/hooks/useTelemetry";
 import { useUiStore } from "@/stores/uiStore";
+import type { Telemetry } from "@/types/api";
 
+/**
+ * `flight.telemetry` não está no mapa abaixo de propósito: é o único evento que
+ * carrega o próprio dado em vez de avisar que algo mudou, e portanto o único
+ * que não invalida chave nenhuma. O motivo — 1 Hz por cliente conectado — está
+ * no ADR 006. Todo evento novo entra no mapa, não aqui.
+ */
 const INVALIDATION_MAP: Record<string, readonly (readonly unknown[])[]> = {
   "flight.connection": [keys.flight.all, keys.dashboard.summary()],
   "flight.endpoint": [keys.flight.status()],
@@ -43,6 +51,10 @@ export function useServerEvents() {
         targets.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       });
     }
+
+    source.addEventListener("flight.telemetry", (event) => {
+      emitTelemetry(JSON.parse((event as MessageEvent<string>).data) as Telemetry);
+    });
 
     return () => {
       source.close();

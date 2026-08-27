@@ -11,3 +11,4 @@ poder discordar de forma informada.
 | [003](003-banco-de-dados.md) | PostgreSQL, imagens fora do banco | Aceita |
 | [004](004-split-temporal.md) | Split temporal com embargo | Aceita |
 | [005](005-design-system.md) | Chakra UI em vez do template Purity | Aceita |
+| [006](006-telemetria-no-evento.md) | Telemetria posicional viaja dentro do evento SSE | Aceita |

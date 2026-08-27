@@ -24,9 +24,15 @@ const HAS_MODEL = Boolean(import.meta.env.VITE_DRONE_MODEL_URL);
 interface Props {
   isFlying: boolean;
   height?: string | number;
+  /**
+   * Texto do rótulo inferior. É apresentação, não dado: quem conhece os estados
+   * intermediários do painel ("DECOLANDO") é quem chama. A cena continua tendo
+   * `isFlying` como única entrada de estado.
+   */
+  label?: string;
 }
 
-export function DroneViewer({ isFlying, height = "100%" }: Props) {
+export function DroneViewer({ isFlying, height = "100%", label }: Props) {
   const reduced = usePrefersReducedMotion();
 
   return (
@@ -90,7 +96,7 @@ export function DroneViewer({ isFlying, height = "100%" }: Props) {
       >
         <StatusDot tone={isFlying ? "live" : "idle"} />
         <Text textStyle="readout" fontSize="xs" color="white">
-          {isFlying ? "EM VOO" : "EM SOLO"}
+          {label ?? (isFlying ? "EM VOO" : "EM SOLO")}
         </Text>
       </Flex>
     </Box>

@@ -6,6 +6,7 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
+from app.integrations.flight_source import FlightSource, get_flight_source
 from app.services.collection_service import CollectionService
 from app.services.dashboard_service import DashboardService
 from app.services.dataset_service import DatasetService
@@ -16,8 +17,13 @@ from app.services.roboflow_service import RoboflowService
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 
 
-def get_flight_service(session: SessionDep) -> FlightService:
-    return FlightService(session)
+# A fonte é única no processo e escolhida pela configuração: `fake` hoje,
+# `mqtt` quando o FlightHub Sync entrar. Ver flight_source/__init__.py.
+FlightSourceDep = Annotated[FlightSource, Depends(get_flight_source)]
+
+
+def get_flight_service(session: SessionDep, source: FlightSourceDep) -> FlightService:
+    return FlightService(session, source=source)
 
 
 def get_collection_service(session: SessionDep) -> CollectionService:

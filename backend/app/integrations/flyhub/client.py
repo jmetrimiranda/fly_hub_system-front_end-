@@ -45,6 +45,17 @@ class FlightProbe:
             self.stream = StreamSnapshot()
 
 
+# Com a fonte de voo simulada não há broker para consultar, e um `connected`
+# eternamente falso esconde metade da interface. Os números são os que o
+# protótipo M4TD reportava com o M4TD publicando de verdade.
+FAKE_PROBE = FlightProbe(
+    broker_up=True,
+    stream=StreamSnapshot(
+        ready=True, resolution="960x720", bitrate_mbps=0.41, codec="H264", readers=1
+    ),
+)
+
+
 class FlyHubClient:
     def __init__(self, media: MediaMtxClient | None = None) -> None:
         self._media = media or MediaMtxClient()
@@ -59,6 +70,9 @@ class FlyHubClient:
         Antes eram duas: uma para saber se o broker respondia e outra para o
         path. Mesma resposta, duas chamadas e duas linhas de log por request.
         """
+        if settings.flight_source == "fake":
+            return FAKE_PROBE
+
         path = stream_path or settings.flyhub_stream_path
         try:
             items = await self._media.list_paths()

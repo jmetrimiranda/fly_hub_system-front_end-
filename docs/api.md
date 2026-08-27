@@ -113,6 +113,25 @@ Estado consolidado da conexão. É a fonte de `isFlying` para o drone 3D.
 
 O frontend informa o endereço; **quem conecta é o backend**.
 
+### `GET /flight/telemetry`
+
+Última posição conhecida da aeronave. Usada **uma vez**, na montagem do mapa,
+para ele abrir já posicionado. As atualizações chegam pelo SSE — isto não é
+endpoint de polling. Ver [ADR 006](decisions/006-telemetria-no-evento.md).
+
+```json
+{
+  "at": "2026-08-27T18:12:38Z",
+  "latitude": -20.785946, "longitude": -40.571144,
+  "altitude_m": 60.0, "heading_deg": 90.0, "horizontal_speed_ms": 6.0,
+  "satellites": 18, "fix_type": "rtk"
+}
+```
+
+`204 No Content` enquanto a fonte de voo não tiver produzido amostra alguma.
+Quem produz é a `FlightSource` escolhida por `FLIGHT_SOURCE` — ver
+[Voo e coleta](flight.md#de-onde-vem-a-telemetria).
+
 ### `GET /flight/events` — SSE
 
 Canal `text/event-stream`. Eventos publicados:
@@ -125,7 +144,12 @@ Canal `text/event-stream`. Eventos publicados:
 | `collection.saved` | Coleta salva e particionada | `flight.collection`, `datasets.*` |
 | `pipeline.status` | Pipeline iniciado ou parado | `flight.pipeline` |
 | `roboflow.progress` / `finished` | Envio ao Roboflow | `datasets.*` |
+| `flight.telemetry` | Nova amostra de posição (1 Hz) | **nada — carrega o dado** |
 | `ping` | A cada 15 s | nada (mantém a conexão viva) |
+
+`flight.telemetry` é a única exceção à regra de que o evento avisa e o cliente
+revalida. O payload é o mesmo corpo de `GET /flight/telemetry`. O motivo e o
+limite da exceção estão no [ADR 006](decisions/006-telemetria-no-evento.md).
 
 ```ts
 // hooks/useServerEvents.ts — o mapa completo está no arquivo

@@ -13,6 +13,7 @@ from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
+from app.integrations.flight_source import get_flight_source
 
 configure_logging()
 log = get_logger(__name__)
@@ -22,8 +23,19 @@ log = get_logger(__name__)
 async def lifespan(_: FastAPI):
     settings.datasets_dir.mkdir(parents=True, exist_ok=True)
     settings.models_dir.mkdir(parents=True, exist_ok=True)
-    log.info("api_started", env=settings.app_env, prefix=settings.api_prefix)
+
+    source = get_flight_source()
+    await source.start()
+
+    log.info(
+        "api_started",
+        env=settings.app_env,
+        prefix=settings.api_prefix,
+        flight_source=settings.flight_source,
+    )
     yield
+
+    await source.stop()
     log.info("api_stopped")
 
 

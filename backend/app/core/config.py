@@ -42,6 +42,17 @@ class Settings(BaseSettings):
     tunnel_enabled: bool = False
     tunnel_public_host: str = ""
 
+    # Fonte de telemetria de voo
+    # `fake` é o padrão de propósito: quem clona o repositório vê a aplicação
+    # inteira funcionando — drone, decolagem, mapa — sem hardware nenhum.
+    # `mqtt` é o lugar reservado para o FlightHub Sync, ainda não implementado.
+    flight_source: Literal["fake", "mqtt"] = "fake"
+    fake_flight_interval: float = 1.0
+    fake_flight_speed_ms: float = 6.0
+    # Terminal Marítimo de Ponta Ubu, Anchieta/ES.
+    fake_flight_center_lat: float = -20.78667
+    fake_flight_center_lon: float = -40.57333
+
     # Armazenamento
     data_root: Path = Path("/data")
     datasets_dir: Path = Path("/data/datasets")

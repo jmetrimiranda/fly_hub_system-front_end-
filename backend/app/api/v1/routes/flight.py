@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.v1.deps import CollectionDep, FlightDep
@@ -14,6 +14,7 @@ from app.schemas.flight import (
     EndpointUpdate,
     FlightStatus,
     PipelineState,
+    Telemetry,
 )
 from app.services.pipeline_service import PipelineService
 
@@ -43,12 +44,25 @@ async def update_endpoint(payload: EndpointUpdate, service: FlightDep) -> Flight
     return await service.update_endpoint(payload)
 
 
+@router.get(
+    "/telemetry",
+    response_model=Telemetry,
+    responses={204: {"description": "Nenhuma amostra produzida ainda"}},
+    summary="Última posição conhecida",
+)
+async def get_telemetry(service: FlightDep) -> Telemetry | Response:
+    """Posição inicial do mapa. As atualizações chegam pelo SSE, não por polling."""
+    sample = await service.telemetry()
+    return sample or Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/events", summary="Telemetria em tempo real (SSE)")
 async def stream_events() -> EventSourceResponse:
     """Canal Server-Sent Events com mudanças de conexão, coleta e pipeline.
 
-    Consumido por `useServerEvents()` no frontend, que injeta cada evento
-    diretamente no cache do TanStack Query.
+    Consumido por `useServerEvents()` no frontend, que traduz cada evento na
+    invalidação da chave de cache afetada. A exceção é `flight.telemetry`, que
+    carrega o próprio dado — o motivo está no ADR 006.
     """
 
     async def publisher() -> AsyncIterator[dict[str, str]]:
