@@ -1,5 +1,7 @@
 """Consultas e agregações do domínio Inspeção."""
 
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import Float, case, cast, func, select

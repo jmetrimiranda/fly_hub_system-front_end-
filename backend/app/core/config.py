@@ -4,12 +4,13 @@ Toda a configuração entra por variável de ambiente — nada de valor sensíve
 código. Ver `.env.example` na raiz do repositório.
 """
 
+import json
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -22,7 +23,12 @@ class Settings(BaseSettings):
     app_env: Literal["development", "staging", "production"] = "development"
     log_level: str = "INFO"
     api_prefix: str = "/api/v1"
-    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # NoDecode desliga o json.loads que a fonte de ambiente aplica a campos de
+    # tipo complexo. Sem ele, `CORS_ORIGINS=a,b` estoura antes do validator
+    # abaixo ser chamado — o parse acontece na leitura, não na validação.
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:5173"]
+    )
 
     # Banco
     database_url: str = "postgresql+asyncpg://flyhub:flyhub@db:5432/flyhub"
@@ -56,9 +62,18 @@ class Settings(BaseSettings):
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: str | list[str]) -> list[str]:
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return value
+        """Aceita `a,b` e `["a","b"]`.
+
+        A vírgula é o formato do .env.example, por ser legível. O JSON é aceito
+        porque é o que pydantic-settings faria por padrão, e porque plataformas
+        de deploy costumam gerar variáveis nesse formato.
+        """
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        if text.startswith("["):
+            return json.loads(text)
+        return [item.strip() for item in text.split(",") if item.strip()]
 
     @property
     def is_production(self) -> bool:
