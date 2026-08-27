@@ -7,11 +7,17 @@ Esta classe existe para que os serviços falem "FlightHub" e não "MediaMTX",
 e para que trocar o transporte não vaze para o resto do sistema.
 
 Resolução e bitrate saem do encoder da aeronave e só mudam no portal da DJI.
+
+Nota de projeto: broker fora do ar NÃO é erro aqui. "Não consegui perguntar" e
+"não há stream" levam à mesma conclusão de domínio — sem sinal. Quem precisa do
+broker de fato (iniciar coleta, iniciar pipeline) usa `require_broker()` e
+recebe o erro. Consultar estado nunca deve derrubar uma tela.
 """
 
 from dataclasses import dataclass
 
 from app.core.config import settings
+from app.core.errors import FlyHubUnavailableError
 from app.core.logging import get_logger
 from app.integrations.mediamtx.client import MediaMtxClient
 
@@ -27,6 +33,18 @@ class StreamSnapshot:
     readers: int = 0
 
 
+@dataclass(slots=True)
+class FlightProbe:
+    """Resultado de uma única consulta ao broker."""
+
+    broker_up: bool = False
+    stream: StreamSnapshot = None  # type: ignore[assignment]
+
+    def __post_init__(self) -> None:
+        if self.stream is None:
+            self.stream = StreamSnapshot()
+
+
 class FlyHubClient:
     def __init__(self, media: MediaMtxClient | None = None) -> None:
         self._media = media or MediaMtxClient()
@@ -35,22 +53,43 @@ class FlyHubClient:
     def publish_url(self) -> str:
         return settings.rtmp_publish_url
 
-    async def broker_up(self) -> bool:
-        return await self._media.is_up()
+    async def probe(self, stream_path: str | None = None) -> FlightProbe:
+        """Estado do broker e do stream numa única ida à rede.
+
+        Antes eram duas: uma para saber se o broker respondia e outra para o
+        path. Mesma resposta, duas chamadas e duas linhas de log por request.
+        """
+        path = stream_path or settings.flyhub_stream_path
+        try:
+            items = await self._media.list_paths()
+        except FlyHubUnavailableError:
+            return FlightProbe(broker_up=False)
+
+        info = next((item for item in items if item.get("name") == path), None)
+        if info is None:
+            return FlightProbe(broker_up=True)
+
+        track = (info.get("tracks") or [None])[0]
+        return FlightProbe(
+            broker_up=True,
+            stream=StreamSnapshot(
+                ready=bool(info.get("ready")),
+                codec=track if isinstance(track, str) else None,
+                bitrate_mbps=round((info.get("bytesReceived", 0) * 8) / 1e6, 2) or None,
+                readers=len(info.get("readers", [])),
+            ),
+        )
+
+    async def require_broker(self) -> None:
+        """Para operações que não fazem sentido sem broker. Levanta se estiver fora."""
+        await self._media.list_paths()
 
     async def tunnel_up(self) -> bool:
         return bool(settings.tunnel_enabled and settings.tunnel_public_host)
 
-    async def snapshot(self, stream_path: str | None = None) -> StreamSnapshot:
-        path = stream_path or settings.flyhub_stream_path
-        info = await self._media.path_status(path)
-        if not info:
-            return StreamSnapshot()
+    # Compatibilidade com chamadas antigas — preferir `probe()`.
+    async def broker_up(self) -> bool:
+        return (await self.probe()).broker_up
 
-        track = (info.get("tracks") or [None])[0]
-        return StreamSnapshot(
-            ready=bool(info.get("ready")),
-            codec=track if isinstance(track, str) else None,
-            bitrate_mbps=round((info.get("bytesReceived", 0) * 8) / 1e6, 2) or None,
-            readers=len(info.get("readers", [])),
-        )
+    async def snapshot(self, stream_path: str | None = None) -> StreamSnapshot:
+        return (await self.probe(stream_path)).stream

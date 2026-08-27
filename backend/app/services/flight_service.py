@@ -34,10 +34,10 @@ class FlightService:
     async def get_status(self) -> FlightStatus:
         """Estado consolidado da conexão. É a fonte de `isFlying` do drone 3D."""
         connection = await self._connection()
-        broker_up = await self._client.broker_up()
+        probe = await self._client.probe(connection.stream_path)
         tunnel_up = await self._client.tunnel_up()
-        stream = await self._client.snapshot(connection.stream_path)
 
+        broker_up, stream = probe.broker_up, probe.stream
         connected = broker_up and stream.ready
         if connected != connection.connected:
             connection.connected = connected

@@ -37,6 +37,12 @@ export function Sidebar() {
       top={0}
       alignSelf="flex-start"
       height="100dvh"
+      // A navegação é uma região distinta do conteúdo, não uma coluna dele.
+      // Fundo levemente recuado + filete separam sem pesar; borda sozinha,
+      // sobre o mesmo fundo, lê como traço solto no meio da tela.
+      bg="bg.subtle"
+      borderRightWidth="1px"
+      borderRightColor="border.subtle"
     >
       <Flex align="center" gap={3} px={2} mb={8}>
         <Flex
