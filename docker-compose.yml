@@ -1,0 +1,79 @@
+name: flyhub
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flyhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-flyhub}
+      POSTGRES_DB: ${POSTGRES_DB:-flyhub}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-flyhub}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-flyhub}:${POSTGRES_PASSWORD:-flyhub}@db:5432/${POSTGRES_DB:-flyhub}
+    volumes:
+      - ./backend:/app
+      - appdata:/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000/api/v1
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on: [backend]
+    command: npm run dev -- --host 0.0.0.0
+
+  docs:
+    build:
+      context: .
+      dockerfile: docs/Dockerfile
+    volumes:
+      - ./docs:/docs/docs
+      - ./mkdocs.yml:/docs/mkdocs.yml
+      - ./site:/docs/site
+    ports:
+      - "8001:8000"
+    command: mkdocs serve --dev-addr 0.0.0.0:8000
+
+  # Broker RTMP/RTSP entre o FlightHub 2 e o backend.
+  # Substitua/aponte para a instância existente em produção.
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    environment:
+      MTX_PROTOCOLS: tcp
+      MTX_API: "yes"
+      MTX_APIADDRESS: ":9997"
+    ports:
+      - "1935:1935"   # RTMP  (publicação vinda do FlightHub)
+      - "8554:8554"   # RTSP  (consumo pelo backend)
+      - "9997:9997"   # API de status
+    profiles: ["stream"]
+
+volumes:
+  pgdata:
+  appdata:

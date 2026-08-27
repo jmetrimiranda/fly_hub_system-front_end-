@@ -1,0 +1,80 @@
+site_name: FlyHub System
+site_description: Plataforma de gerenciamento e acompanhamento de inspeções por drone
+site_url: https://flyhub-docs.pages.dev
+repo_url: https://github.com/jmetrimiranda/fly_hub_system-front_end-
+repo_name: fly_hub_system
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: pt-BR
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: teal
+      toggle: { icon: material/weather-night, name: Modo escuro }
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: teal
+      toggle: { icon: material/weather-sunny, name: Modo claro }
+  features:
+    - navigation.sections
+    - navigation.tabs
+    - navigation.top
+    - navigation.instant
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+    - search.suggest
+
+plugins:
+  - search: { lang: pt }
+  - mermaid2
+  - glightbox
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:mermaid2.fence_mermaid_custom
+  - pymdownx.tabbed: { alternate_style: true }
+  - pymdownx.highlight: { anchor_linenums: true }
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+
+nav:
+  - Início: index.md
+  - Arquitetura:
+      - Visão geral: architecture.md
+      - Modelo de dados: data-model.md
+      - Decisões (ADR):
+          - Índice: decisions/index.md
+          - 001 — Estado no frontend: decisions/001-estado-frontend.md
+          - 002 — Realtime via SSE: decisions/002-realtime-sse.md
+          - 003 — Banco de dados: decisions/003-banco-de-dados.md
+          - 004 — Split temporal: decisions/004-split-temporal.md
+          - 005 — Design system: decisions/005-design-system.md
+  - Frontend:
+      - Estrutura: frontend.md
+      - Modelo 3D: drone-3d.md
+  - Backend:
+      - Estrutura: backend.md
+      - Referência da API: api.md
+  - Domínios:
+      - Voo e coleta: flight.md
+      - Datasets: datasets.md
+      - Inspeções: inspections.md
+      - Roboflow: roboflow.md
+  - Operação:
+      - Docker e Dev Container: docker.md
+      - Desenvolvimento: development.md
+      - Publicação da documentação: docs-hosting.md
