@@ -18,8 +18,8 @@ describe("StatusDot", () => {
 
     expect(live).toBeInTheDocument();
     expect(down).toBeInTheDocument();
-    expect(getComputedStyle(live!).animationName).not.toBe(
-      getComputedStyle(down!).animationName,
-    );
+    // O shorthand, não `animationName`: o cssstyle do jsdom não expande
+    // `animation` em longhands, então `animationName` vem vazio nos dois.
+    expect(getComputedStyle(live!).animation).not.toBe(getComputedStyle(down!).animation);
   });
 });

@@ -30,27 +30,91 @@ Isso mantém a cena testável isoladamente e reusável em qualquer outra tela.
 
 ## Comportamento
 
-| `isFlying` | Corpo | Hélices | Sombra |
+| `isFlying` | Corpo | Rotor | Sombra |
 | --- | --- | --- | --- |
-| `false` | No chão, rotação lenta de apresentação | Paradas | Nítida e próxima |
-| `true` | Sobe ~0,55 e flutua com oscilação leve | Girando | Difusa e distante |
+| `false` | No chão, rotação lenta de apresentação | Disco invisível, pá parada | Nítida e próxima |
+| `true` | Sobe ~0,55 e flutua com oscilação leve | Disco translúcido aberto | Difusa e distante |
 
-A rotação acelera e desacelera com inércia (`MathUtils.damp`). Ligar e desligar
-no seco parece defeito de render, não um drone.
+A velocidade acelera e desacelera com inércia (`MathUtils.damp`, em
+`useSpinSpeed.ts`). Ligar e desligar no seco parece defeito de render, não um
+drone.
 
-## ⚠️ O ponto que vai dar trabalho
+## Por que disco, e não geometria girando
 
-O modelo veio do **Hyper3D Rodin**. Geradores desse tipo costumam exportar uma
-**malha única**, sem as hélices como objetos separados. Sem objetos separados,
-não há o que girar.
+Hélice de drone gira a ~5000 RPM. A 60 fps isso passa de **uma volta por
+quadro**: não existe velocidade de geometria que represente aquilo. Mesmo a
+26 rad/s, que é a velocidade artística usada aqui, são **25° por quadro** — com
+pá de 180° de simetria, já no limite do que o olho lê como rotação contínua.
+Acelerar mais produz o efeito de roda de carroça girando para trás.
 
-Verifique antes de integrar:
+Simulador de voo resolve trocando a pá por um **disco translúcido** acima de um
+limiar de velocidade. É o que o olho vê na realidade, e não estroba, porque não
+há geometria girando.
 
-```bash
-npx gltf-transform inspect public/models/drone.glb
+```mermaid
+flowchart LR
+    p0["0 rad/s<br/>disco invisível<br/>pá parada"]
+    p1["< 8 rad/s<br/>pá girando<br/>disco abrindo"]
+    p2["8 → 14 rad/s<br/>fade cruzado"]
+    p3["> 14 rad/s<br/>só disco"]
+    p0 --> p1 --> p2 --> p3
 ```
 
-Se a saída mostrar um único mesh, é preciso separar no Blender:
+Os limiares estão em `SPIN`, em `useSpinSpeed.ts`. `bladePresence()` devolve
+quanto da pá ainda aparece; o disco usa o complemento, e é isso que faz a troca
+ser cruzada em vez de um corte.
+
+Consequência que importa mais que a estética: **a animação não depende de o
+modelo ter hélices separadas**. Os discos são posicionados por geometria e
+funcionam com um `.glb` de malha única.
+
+## Onde os discos são desenhados
+
+`DroneModel` percorre a cena procurando malhas com cara de hélice — achatadas em
+Y e afastadas do centro no plano XZ. Se encontrar exatamente quatro, usa o centro
+delas e o raio médio. Se não, cai para os quatro cantos da bounding box total, a
+85% do meio-alcance, o que erra pouco em qualquer quadricóptero.
+
+Quando a heurística errar em um modelo específico, o escape é a prop:
+
+```tsx
+<DroneModel isFlying={isFlying} propellerPositions={[[0.6, 0.2, 0.6], /* ... */]} />
+```
+
+O `DronePlaceholder` passa posições fixas, porque conhece a própria geometria.
+
+## O modelo do Rodin
+
+O `.glb` vem do **Hyper3D Rodin**. Mesmo usando *Bang to Parts*, as peças saem
+nomeadas `part_0`, `part_1`… — depender do nome deixaria a cena refém de como o
+exportador batizou os objetos. Por isso a detecção por nome
+(`/prop|blade|rotor|h[ée]lice/i`) continua existindo, mas como **refinamento**:
+se as pás estiverem lá, elas giram até 8 rad/s e somem em fade cruzado. Se não
+estiverem, os discos bastam — e não há mais aviso no console, porque deixou de
+ser problema.
+
+Fluxo de exportação:
+
+1. No Rodin, gerar o modelo e aplicar **Bang to Parts**, depois **Pack**.
+2. Exportar como **glTF 2.0 binário** (`.glb`).
+3. Otimizar (ver abaixo).
+4. Copiar para `frontend/public/models/drone.glb`.
+5. Definir `VITE_DRONE_MODEL_URL` — sem essa variável o `DroneViewer` usa o
+   placeholder.
+
+Para conferir o que saiu, sem abrir o Blender:
+
+```bash
+node scripts/inspect-glb.mjs frontend/public/models/drone.glb
+```
+
+O script lista nome, tipo, contagem de vértices e bounding box de cada nó, e
+diz ao final quantos nós têm nome de hélice. Ele usa `@gltf-transform/core`,
+que é `devDependency` do frontend.
+
+### Separar as pás no Blender (opcional)
+
+Só vale a pena para ganhar o fade cruzado — a animação já funciona sem isso:
 
 1. Importar o `.glb`.
 2. Modo de edição → selecionar cada hélice → **P → Separação por seleção**.
@@ -60,9 +124,14 @@ Se a saída mostrar um único mesh, é preciso separar no Blender:
    de girar no próprio eixo.
 5. Exportar como glTF 2.0 binário.
 
-O `DroneModel` procura nós cujo nome case com `/prop|blade|rotor|h[ée]lice/i`.
-Se não encontrar nenhum, avisa uma vez no console e anima só o corpo — a tela
-não quebra.
+## Movimento reduzido
+
+Com `prefers-reduced-motion: reduce`, o CSS do tema silencia animação e
+transição — mas o que roda dentro do `useFrame` é invisível para o CSS. Por isso
+`usePrefersReducedMotion` existe dentro de `drone3d/`: com a preferência ativa,
+não há flutuação, inclinação, órbita de apresentação nem giro do disco. A cena
+continua indicando o estado — o drone assume a altura de voo e o disco a
+opacidade correspondente —, só não anima.
 
 ## Otimização
 

@@ -29,6 +29,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.4.2",
     "@tanstack/react-query-devtools": "^5.62.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",

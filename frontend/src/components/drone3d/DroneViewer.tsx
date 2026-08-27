@@ -17,6 +17,7 @@ import { Box, Flex, Text } from "@chakra-ui/react";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { DroneModel } from "./DroneModel";
 import { DronePlaceholder } from "./DronePlaceholder";
+import { usePrefersReducedMotion } from "./usePrefersReducedMotion";
 
 const HAS_MODEL = Boolean(import.meta.env.VITE_DRONE_MODEL_URL);
 
@@ -26,6 +27,8 @@ interface Props {
 }
 
 export function DroneViewer({ isFlying, height = "100%" }: Props) {
+  const reduced = usePrefersReducedMotion();
+
   return (
     <Box
       position="relative"
@@ -67,7 +70,8 @@ export function DroneViewer({ isFlying, height = "100%" }: Props) {
           maxPolarAngle={Math.PI / 2.1}
           minDistance={2.4}
           maxDistance={7}
-          autoRotate={!isFlying}
+          // Quem pede menos movimento não recebe a órbita de apresentação.
+          autoRotate={!isFlying && !reduced}
           autoRotateSpeed={0.5}
         />
       </Canvas>

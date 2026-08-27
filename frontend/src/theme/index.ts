@@ -21,8 +21,13 @@ const config = defineConfig({
     },
     "*::selection": { bg: "brand.100" },
     // Acessibilidade: quem pede menos movimento não recebe o voo do drone.
-    "@media (prefers-reduced-motion: reduce)": {
-      "*": { animationDuration: "0.01ms !important", transitionDuration: "0.01ms !important" },
+    // O seletor vem antes da media query — Chakra tipa o interior de um `@media`
+    // como propriedades de estilo, não como um novo nível de seletores.
+    "*": {
+      "@media (prefers-reduced-motion: reduce)": {
+        animationDuration: "0.01ms !important",
+        transitionDuration: "0.01ms !important",
+      },
     },
   },
   theme: {
