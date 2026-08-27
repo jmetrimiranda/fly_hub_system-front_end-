@@ -1,10 +1,32 @@
 {
   "name": "FlyHub System",
-  "dockerComposeFile": ["../docker-compose.yml"],
+
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.devcontainer.yml"
+  ],
   "service": "backend",
-  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
-  "runServices": ["db", "backend", "frontend", "docs"],
+  "workspaceFolder": "/workspaces/fly_hub_system-front_end-",
+
+  // `docs` fica de fora: em 8 GB ele não paga o próprio custo.
+  // Suba sob demanda com `make docs`.
+  "runServices": ["db", "backend", "frontend"],
   "shutdownAction": "stopCompose",
+
+  // Claude Code recusa --dangerously-skip-permissions rodando como root.
+  "remoteUser": "flyhub",
+  "updateRemoteUserUID": true,
+
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1.0": {}
+  },
+
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/flyhub/.claude"
+  },
+
   "forwardPorts": [5173, 8000, 8001, 5432],
   "portsAttributes": {
     "5173": { "label": "Frontend (Vite)", "onAutoForward": "openBrowser" },
@@ -12,7 +34,9 @@
     "8001": { "label": "Documentação (MkDocs)" },
     "5432": { "label": "PostgreSQL" }
   },
+
   "postCreateCommand": "bash .devcontainer/post-create.sh",
+
   "customizations": {
     "vscode": {
       "extensions": [
@@ -20,13 +44,17 @@
         "charliermarsh.ruff",
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
-        "bradlc.vscode-tailwindcss",
         "ms-azuretools.vscode-docker",
         "bierner.markdown-mermaid"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
-        "editor.formatOnSave": true
+        "editor.formatOnSave": true,
+        "files.watcherExclude": {
+          "**/node_modules/**": true,
+          "**/data/**": true,
+          "**/site/**": true
+        }
       }
     }
   }

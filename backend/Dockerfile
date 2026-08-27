@@ -10,10 +10,22 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 
 # --- desenvolvimento: código montado por volume, reload ligado ---------------
+# Roda como usuário não-root por dois motivos: arquivos criados dentro do
+# container não saem com dono root no host, e a CLI do Claude Code recusa
+# --dangerously-skip-permissions quando lançada como root.
 FROM base AS dev
+ARG UID=1000
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends git sudo \
+ && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt requirements-dev.txt ./
 RUN pip install -r requirements-dev.txt
-COPY . .
+RUN useradd --create-home --shell /bin/bash --uid ${UID} flyhub \
+ && echo "flyhub ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/flyhub \
+ && mkdir -p /data /workspaces \
+ && chown -R flyhub:flyhub /app /data /workspaces
+COPY --chown=flyhub:flyhub . .
+USER flyhub
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 

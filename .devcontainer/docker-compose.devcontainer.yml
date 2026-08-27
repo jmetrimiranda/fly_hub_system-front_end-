@@ -1,0 +1,33 @@
+# Sobreposição aplicada apenas quando o VS Code abre o Dev Container.
+# `docker compose up` no terminal continua usando só o compose da raiz.
+#
+# Faz três coisas:
+#   1. monta o repositório inteiro onde o devcontainer.json espera encontrá-lo;
+#   2. dá persistência à autenticação do Claude Code entre rebuilds;
+#   3. impõe teto de memória, para que uma stack de quatro processos não
+#      consuma os 8 GB e leve o sistema ao swap.
+
+services:
+  db:
+    mem_limit: 512m
+    shm_size: 128m
+
+  backend:
+    # Mantém o container vivo: quem inicia o uvicorn é você, no terminal
+    # do VS Code. Sem isso o devcontainer morre junto com o processo.
+    command: sleep infinity
+    volumes:
+      - .:/workspaces/fly_hub_system-front_end-:cached
+      - claude-config:/home/flyhub/.claude
+    mem_limit: 3g
+
+  frontend:
+    environment:
+      NODE_OPTIONS: "--max-old-space-size=2048"
+    mem_limit: 3g
+
+  docs:
+    mem_limit: 384m
+
+volumes:
+  claude-config:
