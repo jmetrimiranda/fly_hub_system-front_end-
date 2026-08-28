@@ -7,6 +7,10 @@ React 19 · FastAPI · PostgreSQL · Docker · MkDocs
 
 ---
 
+> **Para subir o sistema, leia [`starting_aplication.md`](starting_aplication.md).**
+> O `docker compose up` abaixo não é suficiente: o backend precisa ser
+> iniciado à mão dentro do Dev Container.
+
 ## Início rápido
 
 ```bash

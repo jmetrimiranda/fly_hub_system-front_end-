@@ -53,6 +53,7 @@ markdown_extensions:
 
 nav:
   - Início: index.md
+  - Como executar: ../starting_aplication.md
   - Arquitetura:
       - Visão geral: architecture.md
       - Modelo de dados: data-model.md
