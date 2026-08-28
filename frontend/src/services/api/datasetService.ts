@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, apiUrl } from "./client";
 import type {
   DatasetDetail,
   DatasetImage,
@@ -12,11 +12,33 @@ import type {
 } from "@/types/api";
 
 /**
+ * Torna utilizáveis os dois endereços que o backend devolve como caminho.
+ *
+ * `/api/v1/datasets/13/images/1/thumb` num `<img src>` é resolvido contra a
+ * origem da *página*. Em desenvolvimento essa origem é o Vite na 5173, que
+ * responde `index.html` a qualquer rota que não conheça — o navegador recebe
+ * HTML no lugar de JPEG e não desenha nada, sem erro no console e sem sequer
+ * uma requisição visível para a API. `apiUrl` resolve contra a base do axios,
+ * a mesma fonte que o resto do projeto usa.
+ *
+ * A conversão fica aqui, e não no JSX, porque assim vale para todo consumidor
+ * da galeria — a grade, o visor e o que vier depois.
+ */
+const absolutize = (image: DatasetImage): DatasetImage => ({
+  ...image,
+  url: apiUrl(image.url),
+  thumb_url: apiUrl(image.thumb_url),
+});
+
+/**
  * Datasets: listagem, galeria, exclusão, resplit e envio ao Roboflow.
  *
  * Nenhum componente monta URL de API. A grade precisa do endereço da miniatura
  * e o visor do endereço da imagem inteira, e os dois saem do backend dentro de
- * `DatasetImage` — não de concatenação de string no JSX.
+ * `DatasetImage` — não de concatenação de string no JSX. O que o backend
+ * devolve, porém, é caminho (`/api/v1/…`), e caminho num `<img>` é resolvido
+ * contra a origem da página: resolvê-lo é o último passo desta camada, feito
+ * aqui em `absolutize` para que nenhum componente precise saber disso.
  */
 export const datasetService = {
   list: (page = 1, pageSize = 50) =>
@@ -32,7 +54,7 @@ export const datasetService = {
       .get<Page<DatasetImage>>(`/datasets/${id}/images`, {
         params: { split, page, page_size: pageSize },
       })
-      .then((r) => r.data),
+      .then((r) => ({ ...r.data, items: r.data.items.map(absolutize) })),
 
   /**
    * Exclusão individual ou em lote — o mesmo endpoint, porque a diferença é

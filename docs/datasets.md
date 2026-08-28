@@ -284,6 +284,34 @@ aba — é o tipo de coisa que só aparece na primeira coleta grande de verdade,
 aí já é tarde. A miniatura é gerada sob demanda e cacheada em `.thumbs/`,
 invalidada por mtime.
 
+#### O endereço da imagem
+
+O backend devolve os dois campos como **caminho** —
+`/api/v1/datasets/13/images/3016/thumb`, por exemplo. Um caminho num `<img src>`
+não passa pelo axios e é resolvido contra a origem da *página* — que em
+desenvolvimento é o Vite na 5173, não a API na 8000. O Vite responde `index.html` a qualquer rota que não conheça, então o
+navegador recebe HTML onde esperava JPEG: nada é desenhado, o console fica
+limpo e no Network não aparece requisição alguma para `/thumb`. O sintoma é uma
+grade de retângulos vazios com a listagem respondendo certo.
+
+Quem resolve é `apiUrl()`, em `services/api/client.ts`, sobre a mesma
+`VITE_API_BASE_URL` que o axios, o SSE e o MJPEG de `/flight/stream` já usam —
+uma fonte só para o endereço da API, não duas. `datasetService.images()` aplica
+a função nos dois campos antes de entregar ao hook, de modo que a galeria
+recebe endereço pronto e não concatena nada; um `no-restricted-syntax` no
+ESLint recusa literal começando com `/api/` em `components/`, `pages/` e
+`hooks/`, do mesmo jeito que o `no-restricted-imports` recusa axios.
+
+Proxy no Vite resolveria só a galeria e deixaria as imagens saindo por um
+caminho diferente do resto — e não vale em produção, onde o nginx serve página
+e API no mesmo host e `VITE_API_BASE_URL` nem é definida. Lá a base é relativa,
+`apiUrl()` devolve o caminho intacto e nada muda.
+
+| Ambiente | `VITE_API_BASE_URL` | `src` da miniatura |
+| --- | --- | --- |
+| Dev Container / Compose | `http://localhost:8000/api/v1` | `http://localhost:8000/api/v1/datasets/13/images/3016/thumb` |
+| Produção (nginx) | não definida | `/api/v1/datasets/13/images/3016/thumb` |
+
 ### Excluir muda a proporção
 
 Tirar 40 imagens de `train` desloca a divisão de 70/15/15 para outra coisa. O

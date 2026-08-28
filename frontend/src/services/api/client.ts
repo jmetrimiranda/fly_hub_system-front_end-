@@ -53,8 +53,54 @@ api.interceptors.response.use(
   },
 );
 
-/** URL absoluta do canal SSE — o EventSource não passa pelo axios. */
+/**
+ * Endereço de um recurso da API para quem **não** passa pelo axios: `<img>`,
+ * `<video>`, `EventSource`.
+ *
+ * O axios resolve `baseURL` sozinho; uma tag HTML não. Um `src="/api/v1/…"` é
+ * resolvido contra a origem da *página* — que em desenvolvimento é o Vite na
+ * 5173, não a API na 8000. O Vite responde o `index.html` a qualquer rota
+ * desconhecida, então o navegador recebe HTML onde esperava JPEG, descarta em
+ * silêncio e a requisição sequer aparece como erro. Daí a miniatura em branco.
+ *
+ * Aceita as duas formas que aparecem no projeto:
+ *
+ * - caminho relativo à base — `"/flight/events"`;
+ * - caminho já com o prefixo da API — `"/api/v1/datasets/13/images/1/thumb"`,
+ *   como o backend devolve em `url` e `thumb_url`.
+ *
+ * No segundo caso o trecho comum é reaproveitado, não duplicado. Em produção,
+ * onde o nginx serve página e API no mesmo host e `VITE_API_BASE_URL` não é
+ * definida, a base é relativa e o resultado continua relativo — nada muda.
+ */
+export function apiUrl(path: string): string {
+  if (!path) return path;
+  // Esquema (http:, data:, blob:) ou `//host`: já é endereço completo.
+  if (/^[a-z][a-z0-9+.-]*:|^\/\//i.test(path)) return path;
+
+  const suffix = path.startsWith("/") ? path : `/${path}`;
+  const base = (api.defaults.baseURL ?? "/api/v1").replace(/\/$/, "");
+  return base.slice(0, base.length - overlap(base, suffix)) + suffix;
+}
+
+/**
+ * Quantos caracteres do fim da base o caminho já repete.
+ *
+ * A comparação é por segmento inteiro para que `/apiv1` não case com `/api`.
+ * Zero quando não há repetição: o caminho é relativo à base e apenas se soma
+ * a ela.
+ */
+function overlap(base: string, path: string): number {
+  const segments = base.split("/").filter(Boolean);
+  // Do maior candidato para o menor: `/api/v1` antes de `/v1`.
+  for (let i = 0; i < segments.length; i += 1) {
+    const candidate = `/${segments.slice(i).join("/")}`;
+    if (path === candidate || path.startsWith(`${candidate}/`)) return candidate.length;
+  }
+  return 0;
+}
+
+/** URL do canal SSE — o EventSource não passa pelo axios. */
 export function eventsUrl(): string {
-  const base = api.defaults.baseURL ?? "/api/v1";
-  return `${base.replace(/\/$/, "")}/flight/events`;
+  return apiUrl("/flight/events");
 }

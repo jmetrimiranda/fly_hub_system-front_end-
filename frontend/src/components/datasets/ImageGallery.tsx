@@ -13,6 +13,8 @@ const PAGE_SIZE = 60;
  * Grade de miniaturas de uma partição.
  *
  * A grade pede `thumb_url`, de 240 px; o visor pede `url`, o arquivo inteiro.
+ * Os dois chegam prontos de `datasetService`, já resolvidos contra a base da
+ * API — este componente não concatena endereço nenhum.
  * Mandar quinhentos JPEGs em tamanho real para montar uma grade trava a aba —
  * é o tipo de coisa que só aparece na primeira coleta grande de verdade, e aí
  * já é tarde.

@@ -258,7 +258,14 @@ export interface DatasetImage {
   split: SplitName | null;
   embargoed: boolean;
   roboflow_sent_at: string | null;
-  /** Tamanho real. Só no visor — a grade usa `thumb_url`. */
+  /**
+   * Tamanho real. Só no visor — a grade usa `thumb_url`.
+   *
+   * O backend devolve caminho (`/api/v1/…`); `datasetService.images` resolve
+   * os dois contra a base da API antes de entregar ao hook, porque caminho num
+   * `<img src>` é resolvido contra a origem da página — o Vite na 5173, em
+   * desenvolvimento — e não contra a API.
+   */
   url: string;
   thumb_url: string;
 }

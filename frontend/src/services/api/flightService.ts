@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { api, apiUrl } from "./client";
 import type {
   CollectionPreflight,
   CollectionSession,
@@ -26,10 +26,8 @@ export const flightService = {
    * `attempt` existe para o botão de tentar de novo: a URL precisa mudar para
    * o navegador reabrir a conexão em vez de reaproveitar a que falhou.
    */
-  streamUrl: (attempt = 0): string => {
-    const base = (api.defaults.baseURL ?? "/api/v1").replace(/\/$/, "");
-    return attempt > 0 ? `${base}/flight/stream?tentativa=${attempt}` : `${base}/flight/stream`;
-  },
+  streamUrl: (attempt = 0): string =>
+    apiUrl(attempt > 0 ? `/flight/stream?tentativa=${attempt}` : "/flight/stream"),
 
   setEndpoint: (endpoint: string) =>
     api.put<FlightStatus>("/flight/endpoint", { endpoint }).then((r) => r.data),

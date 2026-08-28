@@ -74,6 +74,13 @@ por arquivo, do componente React até a persistência.
   no Compose puro. Some-se a isso que o `env_file` é lido só na *criação* do
   container: editar o `.env` com ele de pé não muda nada, e `restart` não
   resolve, só `up -d --force-recreate`.
+- **Caminho de API em `<img src>` some sem erro nenhum.** O backend devolve
+  `url`/`thumb_url` como `/api/v1/…`; a tag HTML não passa pelo axios e resolve
+  isso contra a origem da *página*, que em dev é o Vite na 5173. O Vite responde
+  `index.html` a rota desconhecida, o navegador recebe HTML onde esperava JPEG e
+  não desenha nada — console limpo e nenhuma requisição no Network. Quem resolve
+  é `apiUrl()` em `services/api/client.ts`, aplicado dentro do service; o ESLint
+  recusa literal `/api/` em componente.
 - **`docker compose build` não substitui o Rebuild do Dev Container.** O Compose
   constrói apenas o Dockerfile; as features (git, Node, Claude Code) vivem noutra
   camada e somem. O sintoma é `claude: command not found`.

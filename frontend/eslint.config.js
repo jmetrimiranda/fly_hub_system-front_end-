@@ -35,5 +35,29 @@ export default [
       ],
     },
   },
+  {
+    // Mesma ideia da regra do axios, um nível acima: nem chamada de rede nem
+    // endereço de rede fora de src/services/api. Um `src="/api/v1/…"` num
+    // componente é resolvido contra a origem da página — o Vite na 5173 em
+    // desenvolvimento —, que responde index.html; a imagem some sem erro e sem
+    // requisição nenhuma no Network. Quem precisa do endereço chama `apiUrl`.
+    files: ["src/components/**/*.{ts,tsx}", "src/pages/**/*.{ts,tsx}", "src/hooks/**/*.ts"],
+    ignores: ["**/*.test.{ts,tsx}"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/^\\/api\\//]",
+          message:
+            "Endereço de API não se monta em componente. Use apiUrl() ou um método de @/services/api.",
+        },
+        {
+          selector: "TemplateElement[value.raw=/^\\/api\\//]",
+          message:
+            "Endereço de API não se monta em componente. Use apiUrl() ou um método de @/services/api.",
+        },
+      ],
+    },
+  },
   { ignores: ["dist", "src/services/api/client.ts", "src/types/api.generated.ts"] },
 ];
