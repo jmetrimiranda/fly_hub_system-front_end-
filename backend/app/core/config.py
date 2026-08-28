@@ -70,12 +70,43 @@ class Settings(BaseSettings):
     data_root: Path = Path("/data")
     datasets_dir: Path = Path("/data/datasets")
     models_dir: Path = Path("/data/models")
+    # Acima disto a coleta não inicia e uma coleta em andamento é pausada. O
+    # disco cheio no meio de um voo é o modo de falha mais caro: o operador só
+    # descobre depois de pousar.
+    disk_limit_pct: float = 90.0
+
+    # Coleta de quadros
+    # `collect_jpeg_quality` é maior que `jpeg_quality`: o MJPEG é descartável,
+    # o quadro gravado vai treinar um modelo e não deve carregar artefato de
+    # compressão que a câmera não produziu.
+    collect_interval_seconds: float = 2.0
+    collect_frame_limit: int = 500
+    collect_jpeg_quality: int = 92
+    collect_queue_max: int = 20
+    collect_writers: int = 2
+    collect_writer_nice: int = 10
+    # Diferença média absoluta (0–255) abaixo da qual dois quadros são "o
+    # mesmo". Medido no M4TD contra o drone pairando: 2.0 descarta o
+    # enquadramento parado e mantém a translação lenta.
+    dedup_threshold: float = 2.0
 
     # Split temporal
     split_train_ratio: float = 0.70
     split_valid_ratio: float = 0.15
     split_test_ratio: float = 0.15
     split_embargo_seconds: int = 5
+    # O M4TD mede a margem em QUADROS (`DEFAULT_MARGIN = 5`), esta plataforma
+    # media em SEGUNDOS. As duas sobrevivem porque protegem contra coisas
+    # diferentes: a de tempo cobre o intervalo de amostragem irregular que a
+    # deduplicação produz, a de quadros garante o mínimo de vizinhos
+    # descartados quando o operador escolhe um intervalo longo. Aplica-se a
+    # união das duas — nunca menos que o M4TD descartava.
+    split_embargo_frames: int = 5
+
+    # Segredo do processo. Deriva a chave que cifra credenciais do Roboflow em
+    # repouso. Sem ele a aplicação sobe, mas recusa gravar credencial e diz o
+    # motivo na tela — inventar um padrão daria falsa sensação de segredo.
+    secret_key: str = ""
 
     # Roboflow
     roboflow_api_key: str = ""
@@ -112,6 +143,11 @@ class Settings(BaseSettings):
     @property
     def roboflow_configured(self) -> bool:
         return bool(self.roboflow_api_key and self.roboflow_workspace and self.roboflow_project)
+
+    @property
+    def secret_configured(self) -> bool:
+        """Há segredo para derivar a chave de cifragem das credenciais?"""
+        return bool(self.secret_key.strip())
 
     @property
     def mediamtx_host(self) -> str:

@@ -100,6 +100,71 @@ export interface Telemetry {
   fix_type: "none" | "gps" | "rtk";
 }
 
+/**
+ * Uma das condições que a coleta exige. `fix` é o que o modal mostra quando
+ * `ok` é falso — dizer "Stream ✕" sem dizer o que fazer deixa quem está em
+ * campo adivinhando.
+ *
+ * `blocking: false` marca condição informativa. O túnel é a única: ele deixou
+ * de ser obrigatório quando o endereço público fixo entrou.
+ */
+export interface PreflightCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  blocking: boolean;
+  detail: string;
+  fix: string | null;
+}
+
+export interface CollectionDefaults {
+  interval_seconds: number;
+  interval_options: number[];
+  frame_limit: number | null;
+  dedup: boolean;
+  dedup_threshold: number;
+}
+
+export interface CollectionPreflight {
+  ok: boolean;
+  checks: PreflightCheck[];
+  failed: PreflightCheck[];
+  next_version: string;
+  disk_percent: number;
+  disk_free_bytes: number;
+  disk_limit_pct: number;
+  defaults: CollectionDefaults;
+}
+
+/** Parâmetros do modal de confirmação. `frame_limit: null` é "ilimitado". */
+export interface CollectionStartParams {
+  interval_seconds: number;
+  frame_limit: number | null;
+  dedup: boolean;
+}
+
+/**
+ * Contadores ao vivo da gravação. `dedup_skipped` aparece na tela de propósito:
+ * sem ele o operador conta 500 amostras, encontra 180 arquivos e passa a tarde
+ * procurando o erro.
+ */
+export interface CollectionProgress {
+  saved: number;
+  bytes: number;
+  elapsed_seconds: number;
+  dedup_skipped: number;
+  stale_skipped: number;
+  io_dropped: number;
+  write_errors: number;
+  queue_depth: number;
+  last_file: string | null;
+  paused_reason: string | null;
+  error: string | null;
+  disk_percent: number;
+  disk_free_bytes: number;
+  disk_over_limit: boolean;
+}
+
 export interface CollectionSession {
   id: number;
   version: string;
@@ -110,6 +175,12 @@ export interface CollectionSession {
   image_count: number;
   disk_bytes: number;
   storage_path: string;
+  sample_interval_seconds: number;
+  frame_limit: number | null;
+  dedup_enabled: boolean;
+  dedup_skipped: number;
+  /** Preenchido só enquanto o gravador está no ar. */
+  progress: CollectionProgress | null;
 }
 
 export interface PipelineState {
@@ -128,6 +199,24 @@ export interface SplitDistribution {
   valid: number;
   test: number;
   embargo_seconds: number;
+  embargo_frames: number;
+  embargoed: number;
+}
+
+/** Contagem **do disco**, contada na hora. Diverge do manifesto após exclusões. */
+export interface SplitCounts {
+  train: number;
+  valid: number;
+  test: number;
+  raw: number;
+  total: number;
+}
+
+export interface SplitWarning {
+  code: string;
+  /** `error` significa dataset que não serve para medir o modelo. */
+  level: "warn" | "error";
+  message: string;
 }
 
 export interface DatasetSummary {
@@ -143,12 +232,95 @@ export interface DatasetSummary {
   roboflow_sent_at: string | null;
 }
 
+export interface DatasetDetail extends DatasetSummary {
+  storage_path: string;
+  ended_at: string | null;
+  roboflow_error: string | null;
+  sample_interval_seconds: number;
+  frame_limit: number | null;
+  dedup_enabled: boolean;
+  dedup_skipped: number;
+  split_at: string | null;
+  counts: SplitCounts;
+  warnings: SplitWarning[];
+  /** O disco não bate mais com o manifesto: houve exclusão desde o split. */
+  drifted: boolean;
+}
+
+export interface DatasetImage {
+  id: number;
+  filename: string;
+  captured_at: string;
+  frame_number: number;
+  width: number | null;
+  height: number | null;
+  size_bytes: number;
+  split: SplitName | null;
+  embargoed: boolean;
+  roboflow_sent_at: string | null;
+  /** Tamanho real. Só no visor — a grade usa `thumb_url`. */
+  url: string;
+  thumb_url: string;
+}
+
+export interface DeleteImagesResult {
+  removed: number;
+  counts: SplitCounts;
+  distribution: SplitDistribution;
+  drifted: boolean;
+}
+
+export interface ResplitResult {
+  version: string;
+  counts: SplitCounts;
+  distribution: SplitDistribution;
+  warnings: SplitWarning[];
+}
+
+/**
+ * A credencial como ela sai da API. Note o que **não** está aqui: a chave.
+ * Nem inteira, nem os últimos quatro caracteres — não existe endpoint que a
+ * devolva.
+ */
+export interface RoboflowCredential {
+  id: number;
+  label: string;
+  workspace: string;
+  project: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface RoboflowCredentialInput {
+  label: string;
+  workspace: string;
+  project: string;
+  api_key: string;
+}
+
+export interface RoboflowUploadInput {
+  credential_id?: number | null;
+  workspace?: string;
+  project?: string;
+  api_key?: string;
+  save_credential?: boolean;
+  label?: string;
+  batch_name?: string;
+  tags?: string[];
+}
+
 export interface RoboflowUploadResult {
   dataset_id: number;
   status: RoboflowStatus;
   uploaded: number;
   failed: number;
+  pending: number;
+  total: number;
+  batch_name: string | null;
+  tags: string[];
+  current_file: string | null;
   message: string | null;
+  active: boolean;
 }
 
 /* --- Inspeções ------------------------------------------------------------ */

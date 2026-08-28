@@ -108,8 +108,18 @@ protótipo resolve, em vez de inventar do zero.
 
 ## Pendências de decisão
 
-- Split proposto é 70/15/15 com 5 s de embargo; o M4TD mostra 50/2/7. Não altere
-  sem confirmação — afeta direto o MAPE exibido no Dashboard.
 - Coordenadas GPS via FlightHub Sync (MQTT) ainda não implementadas. Quando
   forem, exigem interpolação entre amostras (~0,5 Hz) e frames (30 fps), e
   compensação da defasagem do pipeline de vídeo.
+- O M4TD mede o impacto da coleta no FPS (antes × durante) e avisa acima de 20%
+  de queda. Os mecanismos de proteção foram portados; a medição que confirma que
+  eles funcionaram, não.
+
+Resolvidas na migração das fases 2–4:
+
+- **Proporções do split.** A nota de que o M4TD usava 50/2/7 estava errada — ele
+  usa 70/15/15, igual a esta plataforma. O que divergia era a unidade do
+  embargo: quadros lá, segundos aqui. As duas foram mantidas e são aplicadas em
+  união, nunca menos que o protótipo descartava. Ver ADR 004.
+- **`stream_path` no banco versus `FLYHUB_STREAM_PATH`.** A coluna foi removida;
+  a configuração é a fonte única.

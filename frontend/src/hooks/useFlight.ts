@@ -7,6 +7,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { flightService } from "@/services/api";
 import { keys } from "@/lib/queryKeys";
+import type { CollectionStartParams } from "@/types/api";
 
 export function useFlightStatus() {
   return useQuery({
@@ -17,10 +18,30 @@ export function useFlightStatus() {
   });
 }
 
+/**
+ * A coleta em curso. Enquanto o gravador está no ar, os contadores mudam a
+ * cada quadro salvo e nenhum evento SSE os acompanha — a gravação acontece em
+ * thread, e publicar um evento por quadro inundaria o canal. Por isso, e só
+ * enquanto há coleta ativa, isto revalida a cada segundo.
+ */
 export function useCurrentCollection() {
   return useQuery({
     queryKey: keys.flight.collection(),
     queryFn: flightService.getCurrentCollection,
+    refetchInterval: (query) => (query.state.data?.progress ? 1000 : false),
+  });
+}
+
+/**
+ * A guarda da coleta. Revalida sozinha porque é ela que habilita o botão: o
+ * stream cai enquanto ninguém olha, e um botão clicável que falha depois é
+ * pior que um botão desabilitado que explica.
+ */
+export function useCollectionPreflight() {
+  return useQuery({
+    queryKey: keys.flight.preflight(),
+    queryFn: flightService.getCollectionPreflight,
+    refetchInterval: 10_000,
   });
 }
 
@@ -34,8 +55,8 @@ export function useCollectionControls() {
     keysToClear.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
 
   const start = useMutation({
-    mutationFn: flightService.startCollection,
-    onSuccess: () => invalidate([keys.flight.collection()]),
+    mutationFn: (params: CollectionStartParams) => flightService.startCollection(params),
+    onSuccess: () => invalidate([keys.flight.collection(), keys.flight.preflight()]),
   });
   const pause = useMutation({
     mutationFn: flightService.pauseCollection,
@@ -47,10 +68,16 @@ export function useCollectionControls() {
   });
   const save = useMutation({
     mutationFn: flightService.saveCollection,
-    onSuccess: () => invalidate([keys.flight.collection(), keys.datasets.all]),
+    onSuccess: () =>
+      invalidate([keys.flight.collection(), keys.flight.preflight(), keys.datasets.all]),
+  });
+  const cancel = useMutation({
+    mutationFn: flightService.cancelCollection,
+    onSuccess: () =>
+      invalidate([keys.flight.collection(), keys.flight.preflight(), keys.datasets.all]),
   });
 
-  return { start, pause, resume, save };
+  return { start, pause, resume, save, cancel };
 }
 
 export function usePipelineControls() {

@@ -16,6 +16,9 @@ dependencies = [
   "python-multipart>=0.0.12",
   "structlog>=24.4",
   "sse-starlette>=2.1",
+  # Cifra a chave do Roboflow em repouso — ver `core/crypto.py`. Não é
+  # opcional: sem ela a aplicação recusa gravar credencial.
+  "cryptography>=44.0",
   "opencv-python-headless>=4.10",
   "numpy>=1.26,<3",
 ]

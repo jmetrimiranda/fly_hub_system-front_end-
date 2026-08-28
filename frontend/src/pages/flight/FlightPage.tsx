@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { Box, Button, Flex, Grid, GridItem, Input, Table, Text } from "@chakra-ui/react";
-import { Camera, Copy, Pause, Play, Save, Square, TriangleAlert } from "lucide-react";
+import { Copy, Play, Square, TriangleAlert } from "lucide-react";
+import { CollectionPanel } from "@/components/collection/CollectionPanel";
 import { InferenceStream } from "@/components/video/InferenceStream";
 import { StatCard } from "@/components/ui/StatCard";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { ErrorState, LoadingState } from "@/components/ui/States";
 import { StatusDot } from "@/components/ui/StatusDot";
 import {
-  useCollectionControls,
-  useCurrentCollection,
   useEndpointUpdate,
   useFlightStatus,
   usePipeline,
@@ -18,9 +17,7 @@ import { formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 
 export function FlightPage() {
   const status = useFlightStatus();
-  const collection = useCurrentCollection();
   const pipeline = usePipeline();
-  const controls = useCollectionControls();
   const pipelineControls = usePipelineControls();
   const endpointUpdate = useEndpointUpdate();
 
@@ -34,7 +31,6 @@ export function FlightPage() {
 
   const indicators = status.data!.indicators;
   const metrics = status.data!.metrics;
-  const active = collection.data;
   const running = pipeline.data?.status === "running";
 
   return (
@@ -95,63 +91,7 @@ export function FlightPage() {
         {/* Trilho de controles */}
         <GridItem>
           <Flex direction="column" gap={4}>
-            <SurfaceCard title="Coleta de imagens" padding={5}>
-              {!active && (
-                <>
-                  <Button
-                    width="100%"
-                    colorPalette="teal"
-                    loading={controls.start.isPending}
-                    onClick={() => controls.start.mutate()}
-                  >
-                    <Camera size={16} /> Coletar imagens do voo
-                  </Button>
-                  <Text fontSize="xs" color="fg.muted" mt={3}>
-                    A coleta grava os frames originais e particiona ao salvar.
-                  </Text>
-                </>
-              )}
-
-              {active && (
-                <>
-                  <Flex align="center" gap={2} mb={3}>
-                    <StatusDot tone={active.status === "recording" ? "live" : "warn"} />
-                    <Text textStyle="readout" fontSize="sm">
-                      {active.version} · {formatNumber(active.image_count)} imagens
-                    </Text>
-                  </Flex>
-                  <Flex gap={2}>
-                    {active.status === "recording" ? (
-                      <Button
-                        flex="1"
-                        variant="outline"
-                        loading={controls.pause.isPending}
-                        onClick={() => controls.pause.mutate()}
-                      >
-                        <Pause size={16} /> Pausar
-                      </Button>
-                    ) : (
-                      <Button
-                        flex="1"
-                        variant="outline"
-                        loading={controls.resume.isPending}
-                        onClick={() => controls.resume.mutate()}
-                      >
-                        <Play size={16} /> Continuar
-                      </Button>
-                    )}
-                    <Button
-                      flex="1"
-                      colorPalette="teal"
-                      loading={controls.save.isPending}
-                      onClick={() => controls.save.mutate()}
-                    >
-                      <Save size={16} /> Salvar
-                    </Button>
-                  </Flex>
-                </>
-              )}
-            </SurfaceCard>
+            <CollectionPanel />
 
             <SurfaceCard title="Pipeline" padding={5}>
               <Flex align="center" gap={2} mb={3}>

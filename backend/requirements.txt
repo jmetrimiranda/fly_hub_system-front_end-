@@ -12,6 +12,8 @@ httpx>=0.27
 python-multipart>=0.0.12
 structlog>=24.4
 sse-starlette>=2.1
+# Cifra a chave do Roboflow em repouso — ver app/core/crypto.py.
+cryptography>=44.0
 # Sempre a variante headless: `opencv-python` exige libGL, que não existe
 # em servidor limpo, e a aplicação nunca abre janela.
 opencv-python-headless>=4.10

@@ -9,8 +9,9 @@
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\"",
-    "test": "vitest",
-    "types:api": "openapi-typescript http://localhost:8000/openapi.json -o src/types/api.generated.ts"
+    "test": "vitest run",
+    "types:api": "openapi-typescript http://localhost:8000/openapi.json -o src/types/api.generated.ts",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@chakra-ui/react": "^3.36.0",

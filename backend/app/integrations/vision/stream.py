@@ -246,8 +246,20 @@ class VideoStream:
     # --- saída ----------------------------------------------------------------
 
     def latest(self) -> Rendered | None:
-        """Último quadro renderizado. A coleta lê daqui para gravar o original."""
+        """Último quadro renderizado, com a sobreposição. É o que a tela Voo vê."""
         return self._out.peek()
+
+    def raw_frame(self) -> Frame | None:
+        """Último quadro **original**, direto do leitor e antes do detector.
+
+        É daqui que a coleta grava. Ler de `latest()` pegaria a imagem já
+        anotada e contaminaria o dataset com a saída do modelo anterior — a
+        fronteira que o projeto inteiro depende de não cruzar.
+
+        `peek` não consome: a coleta olhar o slot não tira o quadro do worker
+        de inferência.
+        """
+        return self._reader.slot.peek()
 
     async def mjpeg(self) -> AsyncIterator[bytes]:
         """Gerador `multipart/x-mixed-replace`. Um consumidor por cliente.

@@ -33,7 +33,6 @@ erDiagram
     FLIGHT_CONNECTION {
         int id PK
         string endpoint
-        string stream_path
         bool connected
         datetime last_seen_at
     }
@@ -50,12 +49,20 @@ erDiagram
         string version UK
         datetime started_at
         int image_count
+        float sample_interval_seconds
+        int frame_limit
+        bool dedup_enabled
+        int dedup_skipped
         int train_count
         int valid_count
         int test_count
         int embargo_seconds
+        int embargo_frames
+        int embargoed_count
+        datetime split_at
         string status
         string roboflow_status
+        string roboflow_batch
     }
     DATASET_IMAGES {
         int id PK
@@ -65,6 +72,15 @@ erDiagram
         int frame_number
         string split
         bool embargoed
+        datetime roboflow_sent_at
+    }
+    ROBOFLOW_CREDENTIALS {
+        int id PK
+        string label UK
+        string workspace
+        string project
+        string api_key_encrypted
+        datetime last_used_at
     }
     INSPECTIONS {
         int id PK

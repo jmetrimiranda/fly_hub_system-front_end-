@@ -162,19 +162,26 @@ source.addEventListener("collection.saved", () => {
 
 | Método | URL | Objetivo | Erro típico |
 | --- | --- | --- | --- |
+| `GET` | `/flight/collection/preflight` | O que falta para poder gravar | — |
 | `GET` | `/flight/collection/current` | Coleta ativa ou `null` | — |
-| `POST` | `/flight/collection/start` | Inicia e cria a pasta | `409` se já existe |
+| `POST` | `/flight/collection/start` | Inicia com os parâmetros do modal | `409` — inclui `COLLECTION_PREFLIGHT` |
 | `POST` | `/flight/collection/pause` | Pausa | `409` se não está gravando |
 | `POST` | `/flight/collection/resume` | Retoma | `409` se não está pausada |
 | `POST` | `/flight/collection/save` | Encerra e **particiona** | `409` se não há coleta |
-| `POST` | `/flight/collection/cancel` | Descarta | `409` se não há coleta |
+| `POST` | `/flight/collection/cancel` | Descarta sem particionar | `409` se não há coleta |
+
+O `start` leva corpo, e a guarda é revalidada no servidor: o erro
+`COLLECTION_PREFLIGHT` traz em `details.failed` cada condição que impediu, com a
+instrução do que fazer. Ver [Datasets](datasets.md#a-guarda).
 
 ```ts
 const controls = useCollectionControls();
-<Button onClick={() => controls.start.mutate()} loading={controls.start.isPending}>
-  Coletar imagens do voo
-</Button>
+controls.start.mutate({ interval_seconds: 2, frame_limit: 500, dedup: true });
 ```
+
+Enquanto há gravação, `current` traz `progress` com os contadores ao vivo —
+quadros salvos, descartados por repetição, espaço livre. Eles vêm do gravador em
+memória, não do banco: o banco só é escrito no Salvar.
 
 ### Pipeline
 
@@ -191,16 +198,33 @@ const controls = useCollectionControls();
 | Método | URL | Objetivo |
 | --- | --- | --- |
 | `GET` | `/datasets` | Lista paginada |
-| `GET` | `/datasets/{id}` | Detalhe |
-| `GET` | `/datasets/{id}/images` | Frames **originais**, sem inferência |
+| `GET` | `/datasets/{id}` | Detalhe: distribuição, contagens do disco, avisos do split |
+| `GET` | `/datasets/{id}/images?split=` | Frames **originais**, sem inferência |
+| `GET` | `/datasets/{id}/images/{i}/thumb` | Miniatura de 240 px — o que a grade pede |
+| `GET` | `/datasets/{id}/images/{i}/raw` | Imagem em tamanho real — só o visor |
+| `POST` | `/datasets/{id}/images/delete` | Exclusão individual ou em lote |
+| `POST` | `/datasets/{id}/resplit` | Refaz a partição a partir de `raw/` |
+| `POST` | `/datasets/{id}/delete` | Apaga tudo — exige a versão digitada |
 | `POST` | `/datasets/{id}/roboflow` | Envia já particionado — `202 Accepted` |
+| `GET` | `/datasets/{id}/roboflow` | Progresso do envio |
+| `POST` | `/datasets/{id}/roboflow/cancel` | Para depois da imagem atual |
+| `GET` | `/datasets/roboflow/credentials` | Lista — **nunca** a chave |
+| `POST` | `/datasets/roboflow/credentials` | Grava cifrada — `400` sem `SECRET_KEY` |
+| `DELETE` | `/datasets/roboflow/credentials/{id}` | Remove |
+
+As duas exclusões e o `delete` do dataset são `POST` porque levam corpo, e corpo
+em `DELETE` é território cinzento que proxy e cliente HTTP tratam de formas
+diferentes.
 
 ```json
 {
   "id": 1, "version": "v0.0", "started_at": "2026-08-26T13:22:00Z",
   "duration_seconds": 40, "image_count": 59, "disk_bytes": 6396313,
   "status": "saved",
-  "distribution": { "train": 50, "valid": 2, "test": 7, "embargo_seconds": 5 },
+  "distribution": {
+    "train": 50, "valid": 2, "test": 7,
+    "embargo_seconds": 5, "embargo_frames": 5, "embargoed": 12
+  },
   "roboflow_status": "never_sent", "roboflow_sent_at": null
 }
 ```

@@ -23,11 +23,14 @@ import type { Telemetry } from "@/types/api";
 const INVALIDATION_MAP: Record<string, readonly (readonly unknown[])[]> = {
   "flight.connection": [keys.flight.all, keys.dashboard.summary()],
   "flight.endpoint": [keys.flight.status()],
-  "collection.started": [keys.flight.collection()],
+  "collection.started": [keys.flight.collection(), keys.flight.preflight()],
+  // A pausa automática — disco cheio ou limite de quadros — acontece sem
+  // ninguém clicar em nada. Sem este evento a tela continuaria dizendo
+  // "Gravando" com a gravação parada.
   "collection.paused": [keys.flight.collection()],
   "collection.resumed": [keys.flight.collection()],
-  "collection.saved": [keys.flight.collection(), keys.datasets.all],
-  "collection.cancelled": [keys.flight.collection()],
+  "collection.saved": [keys.flight.collection(), keys.flight.preflight(), keys.datasets.all],
+  "collection.cancelled": [keys.flight.collection(), keys.flight.preflight()],
   "pipeline.status": [keys.flight.pipeline()],
   "roboflow.started": [keys.datasets.all],
   "roboflow.progress": [keys.datasets.all],

@@ -9,13 +9,19 @@ from app.models.base import Base, TimestampMixin
 
 
 class FlightConnection(Base, TimestampMixin):
-    """Configuração da conexão com o FlightHub. Linha única (id=1)."""
+    """Configuração da conexão com o FlightHub. Linha única (id=1).
+
+    Não há coluna `stream_path`, e a ausência é deliberada. Ela existia e
+    duplicava `FLYHUB_STREAM_PATH`, que é o que o leitor de quadros consome:
+    duas fontes do mesmo valor, coincidindo por acaso. Com a coleta gravando,
+    um path divergente significa gravar o voo errado sem nenhuma mensagem de
+    erro. A fonte única é a configuração — ver `core/config.py`.
+    """
 
     __tablename__ = "flight_connection"
 
     id: Mapped[int] = mapped_column(primary_key=True, default=1)
     endpoint: Mapped[str] = mapped_column(String(255), default="")
-    stream_path: Mapped[str] = mapped_column(String(120), default="live/m4td")
     tunnel_host: Mapped[str | None] = mapped_column(String(255), nullable=True)
     connected: Mapped[bool] = mapped_column(Boolean, default=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

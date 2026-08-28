@@ -46,6 +46,11 @@ services:
       FLYHUB_PUBLIC_HOST: "${FLYHUB_PUBLIC_HOST:-}"
       TUNNEL_ENABLED: "${TUNNEL_ENABLED:-false}"
       TUNNEL_PUBLIC_HOST: "${TUNNEL_PUBLIC_HOST:-}"
+      # Aqui e não só no env_file: definir o segredo é justamente a mudança que
+      # o operador faz com o container já de pé, e é a forma `${VAR:-}` que faz
+      # o `up -d` recriá-lo. Vazio é válido — a aplicação sobe e recusa gravar
+      # credencial do Roboflow, dizendo o motivo na tela.
+      SECRET_KEY: "${SECRET_KEY:-}"
     # O MediaMTX do M4TD roda no host, fora deste Compose. Em Linux o nome
     # `host.docker.internal` não existe por padrão — sem esta linha ele não
     # resolve e `FLIGHT_SOURCE=real` não acha o broker. É preferível ao IP da

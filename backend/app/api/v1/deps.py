@@ -12,6 +12,7 @@ from app.services.dashboard_service import DashboardService
 from app.services.dataset_service import DatasetService
 from app.services.flight_service import FlightService
 from app.services.inspection_service import InspectionService
+from app.services.roboflow_credentials_service import RoboflowCredentialService
 from app.services.roboflow_service import RoboflowService
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
@@ -38,6 +39,10 @@ def get_roboflow_service(session: SessionDep) -> RoboflowService:
     return RoboflowService(session)
 
 
+def get_roboflow_credentials(session: SessionDep) -> RoboflowCredentialService:
+    return RoboflowCredentialService(session)
+
+
 def get_inspection_service(session: SessionDep) -> InspectionService:
     return InspectionService(session)
 
@@ -50,5 +55,6 @@ FlightDep = Annotated[FlightService, Depends(get_flight_service)]
 CollectionDep = Annotated[CollectionService, Depends(get_collection_service)]
 DatasetDep = Annotated[DatasetService, Depends(get_dataset_service)]
 RoboflowDep = Annotated[RoboflowService, Depends(get_roboflow_service)]
+CredentialDep = Annotated[RoboflowCredentialService, Depends(get_roboflow_credentials)]
 InspectionDep = Annotated[InspectionService, Depends(get_inspection_service)]
 DashboardDep = Annotated[DashboardService, Depends(get_dashboard_service)]

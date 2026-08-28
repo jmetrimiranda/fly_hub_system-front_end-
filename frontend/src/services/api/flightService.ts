@@ -1,5 +1,12 @@
 import { api } from "./client";
-import type { CollectionSession, FlightStatus, PipelineState, Telemetry } from "@/types/api";
+import type {
+  CollectionPreflight,
+  CollectionSession,
+  CollectionStartParams,
+  FlightStatus,
+  PipelineState,
+  Telemetry,
+} from "@/types/api";
 
 /**
  * Voo, coleta e pipeline.
@@ -35,11 +42,19 @@ export const flightService = {
   getTelemetry: (): Promise<Telemetry | null> =>
     api.get<Telemetry>("/flight/telemetry").then((r) => (r.status === 204 ? null : r.data)),
 
+  /**
+   * As pré-condições da coleta. O botão consulta isto para habilitar ou não, e
+   * o modal de erro lista o que voltou com `ok: false`.
+   */
+  getCollectionPreflight: () =>
+    api.get<CollectionPreflight>("/flight/collection/preflight").then((r) => r.data),
+
   getCurrentCollection: () =>
     api.get<CollectionSession | null>("/flight/collection/current").then((r) => r.data),
 
-  startCollection: () =>
-    api.post<CollectionSession>("/flight/collection/start").then((r) => r.data),
+  /** Os parâmetros vêm do modal de confirmação; o servidor revalida a guarda. */
+  startCollection: (params: CollectionStartParams) =>
+    api.post<CollectionSession>("/flight/collection/start", params).then((r) => r.data),
 
   pauseCollection: () =>
     api.post<CollectionSession>("/flight/collection/pause").then((r) => r.data),

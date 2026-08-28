@@ -39,9 +39,7 @@ class FlightService:
         result = await self._session.execute(select(FlightConnection).limit(1))
         connection = result.scalar_one_or_none()
         if connection is None:
-            connection = FlightConnection(
-                id=1, endpoint=settings.rtmp_publish_url, stream_path=settings.flyhub_stream_path
-            )
+            connection = FlightConnection(id=1, endpoint=settings.rtmp_publish_url)
             self._session.add(connection)
             await self._session.commit()
         return connection
@@ -49,7 +47,7 @@ class FlightService:
     async def get_status(self) -> FlightStatus:
         """Estado consolidado da conexão. É a fonte de `isFlying` do drone 3D."""
         connection = await self._connection()
-        probe = await self._client.probe(connection.stream_path)
+        probe = await self._client.probe(settings.flyhub_stream_path)
         tunnel_up = await self._client.tunnel_up()
 
         broker_up, stream = probe.broker_up, probe.stream
@@ -69,14 +67,14 @@ class FlightService:
             availability_label=self._availability_label(connected, stream.bitrate_mbps),
             mediamtx_label="No ar" if broker_up else "Fora do ar",
             tunnel_label=self._tunnel_label(tunnel_up),
-            stream_label=connection.stream_path,
+            stream_label=settings.flyhub_stream_path,
         )
 
         return FlightStatus(
             connected=connected,
             endpoint=connection.endpoint,
             publish_url=self._client.publish_url,
-            stream_path=connection.stream_path,
+            stream_path=settings.flyhub_stream_path,
             indicators=indicators,
             metrics=await self._metrics(stream),
             last_seen_at=connection.last_seen_at,

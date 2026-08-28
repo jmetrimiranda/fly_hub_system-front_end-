@@ -111,9 +111,15 @@ do drone nem o pulso dos LEDs.
 ## Testes
 
 ```bash
-npm run test
+npm test          # vitest run — roda uma vez e sai
+npm run test:watch  # modo interativo
 ```
 
-Vitest + Testing Library. A cobertura inicial mira o que quebra em silêncio:
-formatação (`lib/format.test.ts`) e comportamento condicional de componente
-(`StatusDot.test.tsx`).
+`npm test` **não** entra em watch, de propósito: em CI e em terminal de agente,
+o watch trava esperando entrada que ninguém vai digitar.
+
+Vitest + Testing Library. A cobertura mira o que quebra em silêncio: formatação
+(`lib/format.test.ts`), comportamento condicional de componente
+(`StatusDot.test.tsx`) e as guardas que impedem uma ação errada —
+`CollectionPanel.test.tsx` verifica que a coleta não inicia com o stream
+vermelho e que o modal diz o que fazer.

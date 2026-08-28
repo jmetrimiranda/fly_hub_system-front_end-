@@ -11,7 +11,9 @@ from app.api.v1.deps import CollectionDep, FlightDep
 from app.core.events import bus
 from app.schemas.common import ErrorResponse
 from app.schemas.flight import (
+    CollectionPreflight,
     CollectionSession,
+    CollectionStart,
     EndpointUpdate,
     FlightStatus,
     PipelineState,
@@ -100,10 +102,25 @@ async def stream_events() -> EventSourceResponse:
 # --- coleta ------------------------------------------------------------------
 
 
+@router.get(
+    "/collection/preflight",
+    response_model=CollectionPreflight,
+    summary="Pré-condições da coleta",
+)
+async def collection_preflight(service: CollectionDep) -> CollectionPreflight:
+    """O que falta para poder gravar, item a item, com a instrução de cada um.
+
+    O botão consulta isto para habilitar ou não, e o modal de erro lista o que
+    voltou com `ok=false`. O `start` revalida: a tela pode estar olhando um
+    estado de dois segundos atrás, e o disco pode ter enchido nesse intervalo.
+    """
+    return await service.preflight()
+
+
 @router.get("/collection/current", response_model=CollectionSession | None, summary="Coleta atual")
 async def current_collection(service: CollectionDep) -> CollectionSession | None:
-    dataset = await service.current()
-    return CollectionSession.model_validate(dataset) if dataset else None
+    """Coleta em curso com os contadores ao vivo do gravador — ou `null`."""
+    return await service.current()
 
 
 @router.post(
@@ -113,9 +130,9 @@ async def current_collection(service: CollectionDep) -> CollectionSession | None
     responses=ERRORS,
     summary="Coletar imagens do voo",
 )
-async def start_collection(service: CollectionDep) -> CollectionSession:
-    """Cria a pasta da coleta e passa o estado para `recording`."""
-    return await service.start()
+async def start_collection(payload: CollectionStart, service: CollectionDep) -> CollectionSession:
+    """Cria a versão em disco, sobe o gravador e passa o estado para `recording`."""
+    return await service.start(payload)
 
 
 @router.post("/collection/pause", response_model=CollectionSession, responses=ERRORS)

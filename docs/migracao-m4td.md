@@ -133,25 +133,121 @@ abertura de RTSP.
 
 ---
 
+## Fases 2, 3 e 4 — coleta, split e Roboflow
+
+O ciclo que dá sentido à plataforma: **voa → coleta → split → Roboflow → anota
+→ treina**. As três fases entraram juntas porque não fazem sentido separadas —
+uma coleta que não particiona não vira dataset, e um dataset que não sobe não
+vira anotação.
+
+### O que foi portado, de onde
+
+| M4TD | Aqui | O que mudou |
+| --- | --- | --- |
+| `app/collect.py` (amostradora, fila, workers, dedup, `session.json`) | `backend/app/services/collection_runtime.py` | mesma arquitetura de threads; os parâmetros saem de `settings`, não de `os.environ`, e a auto-pausa publica no barramento SSE |
+| `app/collect.py` (`preflight`, máquina de estados) | `backend/app/services/collection_service.py` | o estado passa a viver no banco também, e a guarda vira schema Pydantic (`CollectionPreflight`) em vez de dicionário |
+| `app/datasets.py` (versões, disco, miniaturas, exclusão) | `backend/app/services/dataset_storage.py` | funções puras de sistema de arquivos; `edits.json`, `roboflow.json` e o `drift` calculado em disco viram colunas e consultas |
+| `app/split.py` (`plan`, `run`, manifesto) | `backend/app/services/split_runner.py` + `services/splitting.py` | a **decisão** já existia aqui como função pura e foi mantida; o `run` virou o executor em disco |
+| `app/roboflow_upload.py` | `backend/app/services/roboflow_service.py` + `integrations/roboflow/client.py` | o SDK síncrono deu lugar a `httpx.AsyncClient`; a thread e o `redirect_stdout` deixaram de ser necessários |
+| — | `backend/app/core/crypto.py`, `services/roboflow_credentials_service.py` | **novo.** O M4TD lia a chave do `.env` e nunca a gravava; aqui ela é cadastrável e cifrada em repouso |
+
+O que **não** veio: a UI Jinja2, o SQLite, o SSE e as rotas do M4TD.
+
+### As decisões que mudaram, e por quê
+
+**A imagem vem do slot do leitor, não do slot de saída.** O M4TD lê
+`video.latest()`, que é o quadro já renderizado, e usa `rendered.frame` para
+recuperar o original. Aqui a coleta lê `video.raw_frame()` diretamente do
+leitor: mesma imagem, um caminho a menos entre a fronteira "Dataset mostra o
+original" e o arquivo gravado.
+
+**O embargo passou a ter duas unidades.** O M4TD media a margem em quadros
+(`DEFAULT_MARGIN = 5`); esta plataforma media em segundos
+(`SPLIT_EMBARGO_SECONDS = 5`). As duas foram mantidas e aplicadas em união — o
+raciocínio está em [Datasets](datasets.md#as-duas-unidades-do-embargo). O
+descarte nunca é menor que o do protótipo.
+
+**As margens encolhem em vez de esvaziar uma partição.** O M4TD já encolhia a
+de quadros; a de segundos ganhou o mesmo tratamento, e por um motivo medido:
+uma coleta de teste de 20 s a 0,5 s produz 40 quadros, e com 5 s de embargo
+**todos** ficam a menos de 5 s de alguma fronteira. As três partições saíam
+vazias de uma vez.
+
+**O envio é `asyncio`, não thread.** A thread do M4TD existia por causa do SDK
+`roboflow`, que é síncrono. Falando HTTP direto, o envio é I/O aguardável e cabe
+numa tarefa do laço de eventos.
+
+**A retomada é por linha, não por arquivo JSON.** O `roboflow.json` do M4TD
+guardava um mapa de enviados; aqui a marca é `dataset_images.roboflow_sent_at`,
+o que faz a consulta de pendentes ser uma cláusula `WHERE` em vez de uma
+diferença de conjuntos em memória.
+
+### Os erros que este trabalho encontrou
+
+Registrados porque nenhum deles aparece em teste unitário — todos vieram de
+rodar a coisa contra o MediaMTX de verdade:
+
+- **A varredura de versões olhava só o disco.** `datasets.version` é único, e
+  linhas cujas pastas foram apagadas continuavam ocupando o número. A coleta
+  seguinte morria numa violação de chave e devolvia um 500 sem explicação. A
+  varredura passou a consultar as duas fontes.
+- **A auto-pausa não chegava ao banco.** Ela acontece na thread do gravador, que
+  não escreve no banco. `Continuar` batia num 409 dizendo que a coleta estava
+  "em recording e a ação exige paused" — com a tela mostrando PAUSADO ao lado.
+  O estado passa a ser reconciliado antes de qualquer guarda.
+- **Continuar depois do limite pausava de novo na hora.** A amostradora gravava
+  um quadro e reavaliava o limite. O comportamento é o mesmo do M4TD; aqui,
+  clicar em Continuar dispensa o limite, porque é uma decisão explícita de
+  ignorá-lo.
+- **A chave do Roboflow ia parar no log.** O `httpx` registra a URL completa em
+  INFO, e a API do Roboflow exige a chave na query string: um lote de 500
+  imagens escrevia a chave 500 vezes. Os loggers `httpx` e `httpcore` foram
+  postos em WARNING, e todo texto vindo de exceção passa por `scrub()`.
+- **Pasta órfã ao falhar o INSERT.** A pasta da versão é criada antes da linha,
+  porque o gravador precisa dela pronta. Uma falha no `commit` deixava a pasta
+  vazia, e a varredura passava a pular um número por tentativa — em silêncio,
+  porque pasta vazia parece dataset. O `start` desfaz.
+
+### Medido nesta plataforma
+
+Com o MediaMTX do host publicando `testsrc` de 960×720 a 30 fps:
+
+```text
+v0.8 · 45 quadros a 0,5 s · dedup ligado · 0 descartados por repetição
+      0 descartes de I/O · 0 erros de escrita
+split: train 28 · valid 1 · test 4 · 12 em embargo
+       embargo pedido 5 s / 5 quadros, aplicado 1 s / 3 quadros
+       avisos: margem_reduzida, embargo_reduzido
+miniatura 7,5 kB · original 45 kB  (6× menos na grade)
+```
+
+A auto-pausa no limite, o `Continuar` na mesma sessão, a exclusão em lote com
+`raw/` limpo junto, o resplit devolvendo `drifted: false` e a credencial cifrada
+foram exercitados nessa mesma execução. Os primeiros 5 s de gravação saíram como
+`stale_skipped` — a conexão RTSP ainda abrindo —, e a sessão continuou aberta e
+voltou a gravar sozinha, que é o comportamento pretendido numa queda do broker.
+
+---
+
 ## O que falta
 
 | Fatia | Estado |
 | --- | --- |
-| Coleta de quadros do voo (`app/collect.py`) | **Não portada.** A coleta desta plataforma cria pasta e registro, mas ainda não grava quadro nenhum. O registro de consumidores já aceita `kind="collect"`, que é o gancho: enquanto uma gravação estiver aberta o leitor tem que continuar mesmo sem navegador na tela. |
-| Amostragem e deduplicação | Não portadas — vêm junto com a coleta. |
-| Split temporal | Existe aqui (`services/splitting.py`), com proporções diferentes das do M4TD. Ver "Pendências" abaixo. |
-| Envio ao Roboflow | Existe aqui; falta conferir contra `app/roboflow_upload.py` do M4TD. |
-| Miniaturas, exclusão de imagens, `edits.json`, resplit | Não portados. |
-| Telemetria GPS | Nenhum dos dois tem. Depende do FlightHub Sync (MQTT), e exigirá interpolação entre amostras (~0,5 Hz) e quadros (30 fps). |
+| Telemetria GPS | Nenhum dos dois tem. Depende do FlightHub Sync (MQTT), e exigirá interpolação entre amostras (~0,5 Hz) e quadros (30 fps), mais compensação da defasagem do pipeline de vídeo. |
 | `POST /model/reload` | O `Detector` já expõe `reload()`; falta a rota, se ela for desejada aqui. |
+| Medição de impacto da coleta no FPS | O M4TD amostra o FPS antes e durante a gravação e acende um aviso acima de 20% de queda (`IMPACT_THRESHOLD_PCT`). Aqui os mecanismos de proteção foram portados — fila limitada, `os.nice`, amostradora sem I/O —, mas a **medição** que confirma que eles funcionaram não. |
+| Agrupar o split por voo | Correto quando houver várias coletas; a interface de `assign_temporal_splits` não muda, só o critério de bloco. Ver [ADR 004](decisions/004-split-temporal.md). |
 
-### Pendências de decisão
+### Pendências resolvidas
 
-- **Proporções do split.** Esta plataforma propõe 70/15/15 com 5 s de embargo; o
-  M4TD usa 50/2/7. Afeta direto o MAPE exibido no Dashboard — não altere sem
-  confirmação.
-- **`FlightConnection.stream_path` versus `FLYHUB_STREAM_PATH`.** O status
-  consulta o broker pelo path gravado no banco (semeado a partir da
-  configuração); o leitor de quadros consome `FLYHUB_STREAM_PATH`. Enquanto os
-  dois forem `live/m4td` não há diferença, mas se um dia o path virar editável
-  pela tela, os dois lados precisam passar a ler a mesma fonte.
+- **Proporções do split.** A anotação de que "o M4TD usa 50/2/7" estava errada:
+  `app/split.py` do protótipo usa `DEFAULT_RATIOS = {"train": 0.70, "valid":
+  0.15, "test": 0.15}`, e `docs/treino/01-dataset.md` documenta o mesmo. As duas
+  bases concordam, e nada mudou no que o Dashboard exibe. O que divergia era a
+  **unidade do embargo**, resolvida pela união das duas.
+- **`FlightConnection.stream_path` versus `FLYHUB_STREAM_PATH`.** A coluna foi
+  removida. Eram duas fontes do mesmo valor coincidindo por acaso, e com a
+  coleta gravando um path divergente significa gravar o voo errado, sem
+  mensagem de erro nenhuma. A fonte única passou a ser a configuração.
+- **`npm test` entrava em watch e travava.** `test` agora é `vitest run`;
+  `test:watch` é o modo interativo.

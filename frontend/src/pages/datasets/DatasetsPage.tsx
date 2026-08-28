@@ -1,9 +1,10 @@
+import { useNavigate } from "react-router-dom";
 import { Badge, Button, Table, Text } from "@chakra-ui/react";
-import { Upload } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { SplitBar } from "@/components/ui/SplitBar";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
-import { useDatasets, useSendToRoboflow } from "@/hooks/useDatasets";
+import { useDatasets } from "@/hooks/useDatasets";
 import { formatBytes, formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import type { RoboflowStatus } from "@/types/api";
 
@@ -17,7 +18,7 @@ const ROBOFLOW_LABEL: Record<RoboflowStatus, { text: string; palette: string }> 
 
 export function DatasetsPage() {
   const datasets = useDatasets();
-  const send = useSendToRoboflow();
+  const navigate = useNavigate();
 
   if (datasets.isLoading) return <LoadingState />;
   if (datasets.isError)
@@ -52,10 +53,15 @@ export function DatasetsPage() {
           <Table.Body>
             {items.map((dataset) => {
               const badge = ROBOFLOW_LABEL[dataset.roboflow_status];
-              const busy = send.isPending && send.variables === dataset.id;
 
+              // A linha inteira abre o detalhe: galeria, exclusão e envio moram
+              // lá, onde há espaço para o modal explicar o que cada um faz.
               return (
-                <Table.Row key={dataset.id}>
+                <Table.Row
+                  key={dataset.id}
+                  cursor="pointer"
+                  onClick={() => navigate(`/datasets/${dataset.id}`)}
+                >
                   <Table.Cell>
                     <Text textStyle="readout" fontWeight="700" color="accent.solid">
                       {dataset.version}
@@ -90,14 +96,8 @@ export function DatasetsPage() {
                     </Badge>
                   </Table.Cell>
                   <Table.Cell textAlign="end">
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      loading={busy}
-                      disabled={dataset.status !== "saved"}
-                      onClick={() => send.mutate(dataset.id)}
-                    >
-                      <Upload size={14} /> Enviar Roboflow
+                    <Button size="xs" variant="ghost" aria-label={`Abrir ${dataset.version}`}>
+                      Abrir <ChevronRight size={14} />
                     </Button>
                   </Table.Cell>
                 </Table.Row>

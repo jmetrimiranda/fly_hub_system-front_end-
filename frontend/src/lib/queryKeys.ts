@@ -16,12 +16,20 @@ export const keys = {
     all: ["flight"] as const,
     status: () => [...keys.flight.all, "status"] as const,
     collection: () => [...keys.flight.all, "collection"] as const,
+    preflight: () => [...keys.flight.all, "preflight"] as const,
     pipeline: () => [...keys.flight.all, "pipeline"] as const,
   },
   datasets: {
     all: ["datasets"] as const,
     list: (page: number) => [...keys.datasets.all, "list", page] as const,
     detail: (id: number) => [...keys.datasets.all, "detail", id] as const,
+    // Sob `detail` de propósito: excluir imagem muda o detalhe, e invalidar
+    // `detail(id)` precisa derrubar a galeria junto. Se `images` fosse irmã de
+    // `detail`, a grade continuaria mostrando a imagem recém-excluída.
+    images: (id: number, split: string, page: number) =>
+      [...keys.datasets.detail(id), "images", split, page] as const,
+    roboflow: (id: number) => [...keys.datasets.detail(id), "roboflow"] as const,
+    credentials: () => [...keys.datasets.all, "credentials"] as const,
   },
   inspections: {
     all: ["inspections"] as const,

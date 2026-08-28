@@ -104,6 +104,80 @@ class EndpointUpdate(BaseModel):
         return value.rstrip("/")
 
 
+class PreflightCheck(ApiModel):
+    """Uma das condições que a coleta exige, com o que fazer se falhar.
+
+    `fix` não é opcional por preguiça: um modal que diz apenas "Stream ✕" faz o
+    operador em campo adivinhar. Ele diz onde clicar.
+
+    `blocking=False` marca condição informativa. O túnel é a única: ele deixou
+    de ser obrigatório quando o endereço público fixo entrou, e exigi-lo
+    bloquearia a coleta numa máquina com IP público, onde ele nem é usado. Por
+    onde o drone alcançou o MediaMTX não muda nada depois que o quadro está
+    chegando ao leitor RTSP local.
+    """
+
+    key: str
+    label: str
+    ok: bool
+    blocking: bool = True
+    detail: str = "—"
+    fix: str | None = None
+
+
+class CollectionDefaults(ApiModel):
+    """O que o modal de confirmação pré-preenche."""
+
+    interval_seconds: float
+    interval_options: list[float]
+    frame_limit: int | None
+    dedup: bool
+    dedup_threshold: float
+
+
+class CollectionPreflight(ApiModel):
+    """Resposta da guarda. O botão só habilita com `ok`."""
+
+    ok: bool
+    checks: list[PreflightCheck]
+    failed: list[PreflightCheck]
+    next_version: str
+    disk_percent: float
+    disk_free_bytes: int
+    disk_limit_pct: float
+    defaults: CollectionDefaults
+
+
+class CollectionStart(BaseModel):
+    """Parâmetros escolhidos no modal. `frame_limit` nulo é "ilimitado"."""
+
+    interval_seconds: float = Field(default=2.0, gt=0, le=60)
+    frame_limit: int | None = Field(default=500, gt=0, le=100_000)
+    dedup: bool = True
+
+
+class CollectionProgress(ApiModel):
+    """Contadores da gravação em curso, lidos do gravador em memória.
+
+    Vêm de disco e de thread, não do banco: o banco só é escrito no Salvar.
+    """
+
+    saved: int = 0
+    bytes: int = 0
+    elapsed_seconds: float = 0.0
+    dedup_skipped: int = 0
+    stale_skipped: int = 0
+    io_dropped: int = 0
+    write_errors: int = 0
+    queue_depth: int = 0
+    last_file: str | None = None
+    paused_reason: str | None = None
+    error: str | None = None
+    disk_percent: float = 0.0
+    disk_free_bytes: int = 0
+    disk_over_limit: bool = False
+
+
 class CollectionSession(ApiModel):
     """Coleta em andamento ou recém-finalizada."""
 
@@ -116,6 +190,12 @@ class CollectionSession(ApiModel):
     image_count: int = 0
     disk_bytes: int = 0
     storage_path: str
+    sample_interval_seconds: float = 2.0
+    frame_limit: int | None = None
+    dedup_enabled: bool = True
+    dedup_skipped: int = 0
+    progress: CollectionProgress | None = None
+    """Preenchido só enquanto o gravador está no ar."""
 
 
 class PipelineState(ApiModel):

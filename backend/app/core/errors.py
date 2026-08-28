@@ -71,6 +71,40 @@ class RoboflowError(AppError):
     http_status = status.HTTP_502_BAD_GATEWAY
 
 
+class SecretKeyMissingError(AppError):
+    code = "SECRET_KEY_MISSING"
+    message = (
+        "SECRET_KEY não está definida. Sem ela a chave do Roboflow não pode ser "
+        "cifrada em repouso, e a aplicação não grava credencial em texto claro. "
+        "Defina SECRET_KEY no .env e reinicie o backend."
+    )
+    http_status = status.HTTP_400_BAD_REQUEST
+
+
+class DiskFullError(AppError):
+    code = "DISK_FULL"
+    message = "Espaço em disco insuficiente para gravar a coleta."
+    http_status = status.HTTP_507_INSUFFICIENT_STORAGE
+
+
+class PreflightError(ConflictError):
+    """Pré-condições da coleta não atendidas.
+
+    Os detalhes carregam a lista de verificações — é o que o modal exibe, item
+    a item, com a instrução do que fazer. Uma mensagem só ("não foi possível
+    iniciar") obrigaria o operador a adivinhar qual das quatro condições falhou.
+    """
+
+    code = "COLLECTION_PREFLIGHT"
+    message = "Não é possível iniciar a coleta."
+
+
+class SplitError(AppError):
+    code = "SPLIT_ERROR"
+    message = "Não foi possível particionar o dataset."
+    http_status = status.HTTP_409_CONFLICT
+
+
 class RoboflowNotConfiguredError(AppError):
     code = "ROBOFLOW_NOT_CONFIGURED"
     message = "Credenciais do Roboflow ausentes. Configure ROBOFLOW_API_KEY, WORKSPACE e PROJECT."

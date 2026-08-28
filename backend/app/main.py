@@ -14,6 +14,7 @@ from app.core.config import settings
 from app.core.errors import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.integrations.flight_source import get_flight_source
+from app.services.collection_runtime import recorder
 from app.services.video_service import VideoService
 
 configure_logging()
@@ -40,6 +41,10 @@ async def lifespan(_: FastAPI):
     )
     yield
 
+    # Uma coleta em andamento durante o desligamento não perde o que já está em
+    # disco: o `session.json` é gravado e `raw/` fica consistente. O split roda
+    # depois, pelo botão Refazer split do dataset.
+    recorder.shutdown()
     VideoService.stop()
     await source.stop()
     log.info("api_stopped")
