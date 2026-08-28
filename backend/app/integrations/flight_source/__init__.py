@@ -10,11 +10,13 @@ from app.core.config import settings
 
 from .base import FixType, FlightSource, Telemetry
 from .fake import FakeFlightSource
+from .null import NullFlightSource
 
 __all__ = [
     "FakeFlightSource",
     "FixType",
     "FlightSource",
+    "NullFlightSource",
     "Telemetry",
     "create_flight_source",
     "get_flight_source",
@@ -24,6 +26,10 @@ __all__ = [
 def create_flight_source() -> FlightSource:
     if settings.flight_source == "fake":
         return FakeFlightSource()
+    if settings.flight_source == "real":
+        # Vídeo e indicadores vêm do MediaMTX de verdade; a posição da aeronave
+        # continua faltando até o FlightHub Sync entrar.
+        return NullFlightSource()
     raise NotImplementedError(
         "FLIGHT_SOURCE=mqtt ainda não foi implementado. A conexão com o FlightHub "
         "Sync entra como MqttFlightSource em app/integrations/flight_source/mqtt.py, "

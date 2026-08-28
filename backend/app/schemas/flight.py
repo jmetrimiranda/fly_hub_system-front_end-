@@ -22,8 +22,28 @@ class FlightIndicators(ApiModel):
     stream_label: str = "—"
 
 
+class ResolutionChange(ApiModel):
+    """Aviso de troca de resolução no meio da transmissão.
+
+    Acontece com a qualidade do canal em "Automático" no FlightHub e é a causa
+    mais comum de queda da captura. Não é dispensável pela interface: enquanto
+    a resolução oscila o problema segue ativo, e um dataset coletado nesse
+    intervalo sai com resoluções misturadas. O servidor deixa de mandá-lo
+    depois de cinco minutos sem nova troca.
+    """
+
+    previous: str
+    current: str
+    at: datetime
+
+
 class ConnectionMetrics(ApiModel):
-    """Linha da tabela CONEXÃO, no rodapé da página Voo."""
+    """Linha da tabela CONEXÃO, no rodapé da página Voo.
+
+    Resolução, taxa e codec vêm do broker; FPS, latência e quadros perdidos são
+    medidos no leitor e no worker de inferência. Campo sem medição é `None` —
+    a tela mostra travessão em vez de número inventado.
+    """
 
     resolution: str | None = None
     bitrate_mbps: float | None = None
@@ -35,6 +55,11 @@ class ConnectionMetrics(ApiModel):
     codec: str | None = None
     model_loaded: bool = False
     model_version: str | None = None
+    model_error: str | None = None
+    """Preenchido só no terceiro estado: havia pesos, mas a carga falhou."""
+    resolution_change: ResolutionChange | None = None
+    stream_error: str | None = None
+    """Motivo da última desconexão do leitor; `None` enquanto há sinal."""
 
 
 class FlightStatus(ApiModel):

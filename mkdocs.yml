@@ -76,6 +76,7 @@ nav:
       - Inspeções: inspections.md
       - Roboflow: roboflow.md
   - Operação:
+      - Migração do M4TD: migracao-m4td.md
       - Docker e Dev Container: docker.md
       - Desenvolvimento: development.md
       - Publicação da documentação: docs-hosting.md

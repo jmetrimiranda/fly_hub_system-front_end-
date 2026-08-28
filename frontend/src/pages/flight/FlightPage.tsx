@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Box, Button, Flex, Grid, GridItem, Input, Table, Text } from "@chakra-ui/react";
-import { Camera, Copy, Pause, Play, Save, Square } from "lucide-react";
+import { Camera, Copy, Pause, Play, Save, Square, TriangleAlert } from "lucide-react";
+import { InferenceStream } from "@/components/video/InferenceStream";
 import { StatCard } from "@/components/ui/StatCard";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { ErrorState, LoadingState } from "@/components/ui/States";
@@ -64,44 +65,31 @@ export function FlightPage() {
       <Grid templateColumns={{ base: "1fr", xl: "minmax(0, 2fr) minmax(320px, 1fr)" }} gap={6}>
         {/* Vídeo com o resultado do modelo aplicado — fluxo separado do Dataset */}
         <GridItem>
-          <Box
-            rounded="card"
-            overflow="hidden"
-            bg="bg.viewer"
-            borderWidth="1px"
-            borderColor="border.subtle"
-            minH="460px"
-            position="relative"
-          >
-            <Flex align="center" justify="center" height="100%" minH="460px" direction="column" gap={2}>
-              <Text textStyle="label" color="whiteAlpha.700">
-                Stream com inferência
-              </Text>
-              <Text fontSize="sm" color="whiteAlpha.600" maxW="46ch" textAlign="center">
-                {indicators.stream_up
-                  ? "Reproduzindo o stream processado pelo pipeline."
-                  : "Sem sinal. Publique o endereço abaixo no FlightHub para começar."}
-              </Text>
-            </Flex>
+          {metrics.resolution_change && (
             <Flex
-              position="absolute"
-              left={4}
-              bottom={4}
-              align="center"
+              align="flex-start"
               gap={2}
-              bg="blackAlpha.600"
-              px={3}
-              py={1.5}
-              rounded="control"
+              mb={3}
+              px={4}
+              py={3}
+              rounded="card"
+              borderWidth="1px"
+              borderColor="signal.warn"
+              bg="bg.subtle"
             >
-              <StatusDot tone={pipeline.data?.model_loaded ? "live" : "warn"} />
-              <Text textStyle="readout" fontSize="xs" color="white">
-                {pipeline.data?.model_loaded
-                  ? `MODELO ${pipeline.data.model_version}`
-                  : "SEM MODELO — vídeo cru"}
+              <Box color="signal.warn" mt="2px">
+                <TriangleAlert size={16} />
+              </Box>
+              <Text fontSize="sm">
+                A resolução do stream mudou de {metrics.resolution_change.previous} para{" "}
+                {metrics.resolution_change.current} às{" "}
+                {formatDateTime(metrics.resolution_change.at)}. Costuma ser a qualidade do canal em
+                “Automático” no FlightHub, e é a causa mais comum de queda da captura — uma coleta
+                feita agora sai com resoluções misturadas.
               </Text>
             </Flex>
-          </Box>
+          )}
+          <InferenceStream connected={status.data!.connected} metrics={metrics} />
         </GridItem>
 
         {/* Trilho de controles */}
@@ -227,8 +215,9 @@ export function FlightPage() {
                 Salvar endereço
               </Button>
               <Text fontSize="xs" color="fg.muted" mt={3}>
-                O endereço muda a cada reinício do túnel. Depois de colar no FlightHub, reedite o
-                canal de encaminhamento e desligue e religue o toggle.
+                O endereço é fixo: com o host público definido, ele não muda entre reinícios. Depois
+                de colar no FlightHub, reedite o canal de encaminhamento e desligue e religue o
+                toggle — sem isso o drone continua publicando no endereço antigo.
               </Text>
             </SurfaceCard>
           </Flex>

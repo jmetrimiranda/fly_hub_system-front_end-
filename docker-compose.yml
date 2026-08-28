@@ -22,8 +22,36 @@ services:
       context: ./backend
       target: dev
     env_file: [.env]
+    # Repasse explícito, nunca valor fixo. O `env_file` acima é lido pelo Docker
+    # UMA VEZ, quando o container é criado: editar o .env com o container de pé
+    # não muda nada, e o sintoma é comportamento antigo sem erro nenhum. Já a
+    # forma `${VAR:-padrao}` é interpolada pelo Compose a cada comando, lendo o
+    # .env da raiz na hora — e a mudança de valor faz o `up -d` recriar o
+    # container. O padrão é o que funciona no Compose puro, sem Dev Container:
+    # MediaMTX no profile `stream`, dentro desta rede. Quem não tem .env sobe
+    # igual; quem tem, manda.
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-flyhub}:${POSTGRES_PASSWORD:-flyhub}@db:5432/${POSTGRES_DB:-flyhub}
+      # Aspas em todos: sem elas o YAML converte `1935` em número e `false` em
+      # booleano, e um valor vazio vira `null` — que no Compose não significa
+      # string vazia, e sim "herde do shell do host, ou omita".
+      MEDIAMTX_API_URL: "${MEDIAMTX_API_URL:-http://mediamtx:9997}"
+      MEDIAMTX_RTSP_URL: "${MEDIAMTX_RTSP_URL:-rtsp://mediamtx:8554}"
+      FLIGHT_SOURCE: "${FLIGHT_SOURCE:-fake}"
+      FLYHUB_RTMP_HOST: "${FLYHUB_RTMP_HOST:-mediamtx}"
+      FLYHUB_RTMP_PORT: "${FLYHUB_RTMP_PORT:-1935}"
+      FLYHUB_STREAM_PATH: "${FLYHUB_STREAM_PATH:-live/m4td}"
+      # Vazio é valor válido: faz o endereço RTMP ser montado com o host do
+      # próprio MediaMTX, como em `config.py`.
+      FLYHUB_PUBLIC_HOST: "${FLYHUB_PUBLIC_HOST:-}"
+      TUNNEL_ENABLED: "${TUNNEL_ENABLED:-false}"
+      TUNNEL_PUBLIC_HOST: "${TUNNEL_PUBLIC_HOST:-}"
+    # O MediaMTX do M4TD roda no host, fora deste Compose. Em Linux o nome
+    # `host.docker.internal` não existe por padrão — sem esta linha ele não
+    # resolve e `FLIGHT_SOURCE=real` não acha o broker. É preferível ao IP da
+    # rede local no .env, que muda quando o DHCP renova.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
       - appdata:/data
@@ -38,8 +66,20 @@ services:
     build:
       context: ./frontend
       target: dev
+    # Mesmo problema, e aqui era pior: o serviço não tem `env_file`, então as
+    # VITE_* do .env nunca chegavam ao Vite. Não se resolve dando o .env
+    # inteiro a este container — ele carrega segredo (ROBOFLOW_API_KEY,
+    # POSTGRES_PASSWORD) que não tem o que fazer num build de frontend.
+    # Repassa-se, uma a uma, só o que é de build-time.
     environment:
-      VITE_API_BASE_URL: http://localhost:8000/api/v1
+      VITE_API_BASE_URL: "${VITE_API_BASE_URL:-http://localhost:8000/api/v1}"
+      # VITE_DRONE_MODEL_URL fica de fora DE PROPÓSITO, apesar de existir no
+      # .env. `DroneViewer` liga o modelo 3D com
+      # `Boolean(import.meta.env.VITE_DRONE_MODEL_URL)`, e o arquivo apontado
+      # ainda não existe (`frontend/public/models/` só tem o README). Repassar
+      # hoje trocaria o placeholder por um `useGLTF` de arquivo ausente.
+      # Quando o .glb entrar no repositório, acrescente aqui:
+      #   VITE_DRONE_MODEL_URL: "${VITE_DRONE_MODEL_URL:-}"
     volumes:
       - ./frontend:/app
     ports:

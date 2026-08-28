@@ -20,10 +20,13 @@ Duas consequências que costumam surpreender quem chega ao projeto:
 1. **Resolução e bitrate não são configuráveis aqui.** Saem do encoder da
    aeronave e só mudam no portal da DJI. A interface mostra os valores; não
    oferece controle que não existe.
-2. **O endereço do túnel muda a cada reinício.** Depois de colar o novo
-   endereço no FlightHub, é preciso reeditar o canal de encaminhamento e
-   desligar e religar o toggle — sem isso o drone continua publicando no
-   endereço antigo. Esse aviso está na interface, na página Voo.
+2. **O endereço não muda mais entre reinícios — desde que haja host fixo.**
+   Com `FLYHUB_PUBLIC_HOST` definido (o `PUBLIC_HOST` do `start.sh` do M4TD), o
+   endereço é estável; o túnel só existe para máquina sem IP público, e é o
+   endereço *dele* que muda a cada reinício. Em qualquer um dos dois casos,
+   depois de colar o endereço no FlightHub é preciso reeditar o canal de
+   encaminhamento e desligar e religar o toggle — sem isso o drone continua
+   publicando no endereço antigo. Esse aviso está na interface, na página Voo.
 
 ## De onde vem a telemetria
 
@@ -96,6 +99,164 @@ segundo por cliente conectado. A exceção, o motivo e o limite dela estão no
 O endpoint `GET /flight/telemetry` continua existindo, mas para outra coisa: o
 mapa se posiciona na montagem sem esperar o próximo tick. Devolve `204` enquanto
 a fonte não tiver produzido amostra alguma.
+
+## O vídeo com inferência
+
+A tela Voo mostra o quadro **depois** da inferência. É a única tela que mostra
+imagem processada: Dataset mostra sempre a original, e as duas nunca se
+misturam.
+
+```mermaid
+flowchart LR
+    mtx["MediaMTX<br/>(no host)"] -->|RTSP| leitor["RtspReader<br/>thread"]
+    leitor --> slot1["slot de 1 quadro"]
+    slot1 --> worker["VideoStream<br/>detect + overlay + JPEG"]
+    worker --> slot2["slot de 1 JPEG"]
+    slot2 --> mjpeg["GET /flight/stream<br/>multipart"]
+    mjpeg --> img["&lt;img&gt; InferenceStream"]
+```
+
+**Entre os estágios há um slot de um quadro, não uma fila.** Publicar
+sobrescreve o que estiver lá e conta o quadro como perdido; quem consome sempre
+pega o mais recente. É isso que impede a latência de acumular quando a
+inferência é mais lenta que o stream — com fila, nada se perderia e a latência
+cresceria sem teto. A inferência roda uma vez por quadro, não uma vez por
+cliente: dois navegadores abertos não dobram o custo.
+
+### O RTSP só é consumido quando alguém precisa
+
+O `Consumers` registra quem precisa da conexão aberta, com dois tipos: `mjpeg`
+(um por resposta multipart aberta) e `collect` (uma sessão de gravação, que
+entra com a coleta de quadros). A decisão de fechar olha o **total**, nunca a
+contagem de clientes HTTP: durante uma coleta pode não haver navegador nenhum
+aberto e o leitor tem que continuar. Sem consumidor por dez segundos, o
+`VideoCapture` é liberado e o path do MediaMTX perde o leitor.
+
+### Sem sinal, a resposta não encerra
+
+O gerador MJPEG passa a emitir um quadro sintético com o motivo, a ~1 fps.
+Encerrar o multipart deixaria um ícone quebrado na tela e obrigaria o navegador
+a reconectar; assim, quando o stream volta, a imagem volta sozinha na mesma
+conexão. O player ainda trata `onError` — com mensagem e botão de tentar de
+novo — porque a resposta pode cair por outros motivos, e `<img>` quebrado não é
+estado aceitável em tela de operação.
+
+### Reconexão
+
+Backoff exponencial de 1 s dobrando até o teto de 10 s. Duas sutilezas que
+vieram medidas do M4TD e não devem ser desfeitas:
+
+- **O backoff é zerado por um quadro lido, não por uma conexão aberta.** Um path
+  que abre e nunca entrega quadro reiniciava o backoff a cada ciclo — uma
+  abertura de RTSP por segundo, para sempre, cada uma custando um FFmpeg
+  inteiro.
+- **O leitor não tenta abrir quando o broker diz que não há path.** Nesse estado
+  a espera é de um segundo relendo o cache do `PathProbe`, e não o backoff
+  acumulado; a captura recomeça quase imediatamente quando o drone volta.
+
+### O modelo é opcional
+
+Sem arquivo de pesos, `Detector.detect()` devolve o quadro intacto e nenhuma
+detecção. Isso não é erro: é o ponto de partida do projeto — o objetivo da
+coleta é criar o dataset para treinar o primeiro modelo. São três estados, e a
+tela sempre diz em qual está, porque ver vídeo cru achando que são detecções
+reais é pior do que não ver nada:
+
+| `model_loaded` | `model_error` | Badge |
+| --- | --- | --- |
+| `true` | `null` | `MODELO best.pt` (verde) |
+| `false` | `null` | `SEM MODELO — vídeo cru` (amarelo) |
+| `false` | texto | `MODELO NÃO CARREGOU — vídeo cru` (vermelho) |
+
+`ultralytics` é importado **dentro** da função de carga, nunca no topo do
+módulo: ele arrasta torch (~2,5 GB) e a aplicação precisa subir sem ele. Por
+isso ele mora em `backend/requirements-vision.txt`, separado. Os pesos são
+recarregados sozinhos quando o arquivo muda — o operador copia o `best.pt` para
+`MODELS_DIR` com a aplicação no ar e a tela muda de estado em segundos.
+
+### A tabela CONEXÃO
+
+Metade vem do broker, metade do leitor, e as duas se encontram em
+`FlightService._metrics()`:
+
+| Coluna | Origem |
+| --- | --- |
+| Resolução | `tracks2[].codecProps` do MediaMTX; o leitor é a reserva |
+| Taxa | derivada de `bytesReceived` entre duas consultas |
+| FPS captura | medido no leitor, janela deslizante de 3 s |
+| FPS inferência | medido no worker, mesma janela |
+| Latência | do instante de captura até o JPEG pronto |
+| Quadros perdidos | sobrescritos no slot sem ninguém consumir |
+| Tempo de stream | desde que o leitor abriu o RTSP; sem leitor, o `readyTime` do broker |
+
+Com o modelo carregado, o FPS de inferência cai e o de captura não — a diferença
+entre os dois é exatamente o que vira quadro perdido.
+
+### O aviso de mudança de resolução
+
+Quando a resolução decodificada muda, `resolution_change` é preenchido e a tela
+exibe um aviso acima do vídeo. Acontece com a qualidade do canal em "Automático"
+no FlightHub e é a causa mais comum de queda da captura. Três decisões:
+
+- **A comparação atravessa reconexões**, de propósito: trocar a qualidade do
+  canal derruba a sessão RTSP e a resolução nova só aparece na reconexão
+  seguinte. Zerar ali apagaria o aviso justamente no caso que ele existe para
+  pegar.
+- **Não é dispensável pela interface.** Enquanto a resolução oscila o problema
+  segue ativo, e um dataset coletado nesse intervalo sai com resoluções
+  misturadas.
+- **Some sozinho** após cinco minutos sem nova troca. Quem decide é o servidor; o
+  cliente só reflete.
+
+### A cadeia, arquivo por arquivo
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Op as Operador
+    participant UI as FlightPage.tsx
+    participant P as InferenceStream.tsx
+    participant S as flightService
+    participant R as routes/flight.py
+    participant Sv as VideoService
+    participant V as vision/stream.py
+    participant L as vision/reader.py
+    participant D as vision/detector.py
+
+    Op->>UI: abre a tela Voo com sinal
+    UI->>P: <InferenceStream connected metrics />
+    P->>S: flightService.streamUrl()
+    P->>R: GET /api/v1/flight/stream
+    R->>Sv: VideoService.frames()
+    Sv->>V: video.mjpeg()
+    V->>V: registra consumidor "mjpeg"
+    L->>L: abre o RTSP e publica no slot
+    V->>D: detect(quadro)
+    D-->>V: quadro, detecções (vazio em passthrough)
+    V->>V: desenha caixas + HUD, codifica JPEG
+    V-->>P: --frame ... image/jpeg
+    Op->>UI: fecha a aba
+    V->>V: descarta o consumidor
+    L->>L: 10 s ocioso => libera o VideoCapture
+```
+
+| Elo | Arquivo |
+| --- | --- |
+| Player | `frontend/src/components/video/InferenceStream.tsx` |
+| Tela | `frontend/src/pages/flight/FlightPage.tsx` |
+| Service (front) | `frontend/src/services/api/flightService.ts` → `streamUrl()` |
+| Tipos | `frontend/src/types/api.ts` → `ConnectionMetrics`, `ResolutionChange` |
+| Rota | `backend/app/api/v1/routes/flight.py` → `GET /flight/stream` |
+| Service (back) | `backend/app/services/video_service.py` |
+| Worker e MJPEG | `backend/app/integrations/vision/stream.py` |
+| Leitor RTSP | `backend/app/integrations/vision/reader.py` |
+| Detector | `backend/app/integrations/vision/detector.py` |
+| Medição | `backend/app/integrations/vision/metrics.py` |
+| Broker | `backend/app/integrations/mediamtx/client.py` |
+| Métricas na tela | `backend/app/services/flight_service.py` → `_metrics()` |
+
+O que foi portado do protótipo, o que ficou de fora e o que ainda falta está em
+[Migração do M4TD](migracao-m4td.md).
 
 ## Painel de voo do Dashboard
 

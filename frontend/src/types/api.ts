@@ -44,6 +44,17 @@ export interface FlightIndicators {
   stream_label: string;
 }
 
+/**
+ * Troca de resolução no meio da transmissão. Acontece com a qualidade do canal
+ * em "Automático" no FlightHub e é a causa mais comum de queda da captura — a
+ * tela avisa enquanto o servidor mandar isto preenchido.
+ */
+export interface ResolutionChange {
+  previous: string;
+  current: string;
+  at: string;
+}
+
 export interface ConnectionMetrics {
   resolution: string | null;
   bitrate_mbps: number | null;
@@ -55,6 +66,11 @@ export interface ConnectionMetrics {
   codec: string | null;
   model_loaded: boolean;
   model_version: string | null;
+  /** Preenchido só no terceiro estado: havia pesos, mas a carga falhou. */
+  model_error: string | null;
+  resolution_change: ResolutionChange | null;
+  /** Motivo da última desconexão do leitor; `null` enquanto há sinal. */
+  stream_error: string | null;
 }
 
 export interface FlightStatus {

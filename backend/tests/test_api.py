@@ -32,6 +32,17 @@ async def test_saving_without_an_active_collection_conflicts(client):
     assert response.json()["error"]["code"] == "COLLECTION_STATE"
 
 
+async def test_flight_status_fills_the_connection_table(client):
+    """Com `FLIGHT_SOURCE=fake` a tabela CONEXÃO não fica só de travessão."""
+    response = await client.get("/api/v1/flight/status")
+    assert response.status_code == 200
+
+    metrics = response.json()["metrics"]
+    assert metrics["resolution"] and metrics["capture_fps"]
+    assert metrics["model_loaded"] is False  # sem pesos: passthrough
+    assert metrics["resolution_change"] is None
+
+
 async def test_endpoint_rejects_an_unsupported_scheme(client):
     response = await client.put("/api/v1/flight/endpoint", json={"endpoint": "ftp://x"})
     assert response.status_code == 422

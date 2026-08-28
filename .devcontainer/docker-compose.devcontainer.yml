@@ -18,6 +18,9 @@ services:
     command: sleep infinity
     volumes:
       - .:/workspaces/fly_hub_system-front_end-:cached
+      # Repositório irmão, somente leitura: é referência para a migração,
+      # não algo a ser editado daqui.
+      - ../flyhub_connecting:/workspaces/flyhub_connecting:ro
       - claude-config:/home/flyhub/.claude
     mem_limit: 3g
 

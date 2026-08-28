@@ -160,7 +160,7 @@ só para `git`.
 | --- | --- |
 | Arquivo `.py` | Nada — o `--reload` cuida |
 | Arquivo `.tsx` / `.ts` | Nada — o HMR do Vite cuida |
-| `.env` | `Ctrl+C` no uvicorn e subir de novo |
+| `.env` | `dcf up -d --force-recreate backend` **e depois** `Ctrl+C` no uvicorn e subir de novo — ver Problemas conhecidos |
 | `docker-compose.yml` | `dcf up -d --force-recreate <serviço>` |
 | `backend/Dockerfile` | Rebuild do Dev Container |
 | `package.json` | `dcf restart frontend` |
@@ -318,6 +318,66 @@ Resquício do volume anônimo que foi removido do compose.
 sudo chown -R flyhub:flyhub frontend/node_modules
 cd frontend && npm install
 ```
+
+### Mudei o `.env` e nada mudou
+
+O sintoma é o pior possível: **nenhum erro**, só comportamento antigo. Trocar
+`FLIGHT_SOURCE=real` e continuar vendo o log da fonte simulada, ou apontar o
+`MEDIAMTX_API_URL` para o host e o log insistir em `mediamtx:9997`.
+
+São dois mecanismos, e os dois terminam em variável de ambiente do processo
+vencendo do arquivo `.env`, porque é isso que o pydantic-settings faz.
+
+**1. O `env_file` do Compose é uma fotografia.** O Docker lê o `.env` uma única
+vez, quando *cria* o container, e copia os valores para dentro dele. Editar o
+arquivo depois não alcança um container que já existe — nem `restart` resolve,
+porque `restart` reaproveita o mesmo container.
+
+```bash
+# 🐳 CONTAINER — o que o processo realmente enxerga
+env | grep -E 'MEDIAMTX|FLIGHT_SOURCE|FLYHUB'
+```
+
+Se a saída divergir do `.env`, é este caso:
+
+```bash
+# 🖥️ HOST
+dcf up -d --force-recreate backend
+```
+
+No Dev Container, isso derruba o terminal do VS Code junto: reabra a janela.
+
+**2. Valor fixo no bloco `environment:` sobrepõe o `.env`, em silêncio.** Um
+`MEDIAMTX_API_URL: http://mediamtx:9997` escrito literalmente no compose ganha
+do `env_file` sempre, e não há aviso nenhum. Por isso todo valor daquele bloco
+hoje é repasse — `${VAR:-padrao}`, nunca literal. Mantenha assim ao acrescentar
+variável: o padrão é o que funciona no Compose puro, e o `.env` continua sendo
+a única fonte de verdade.
+
+Confira o que o Compose resolveu, sem subir nada:
+
+```bash
+# 🖥️ HOST
+dcf config | grep -A25 'backend:'
+```
+
+O serviço `frontend` é caso à parte: ele **não** tem `env_file`, de propósito —
+não deve enxergar `ROBOFLOW_API_KEY` nem `POSTGRES_PASSWORD`. Cada `VITE_*`
+precisa ser repassada uma a uma no `environment:` dele.
+
+### `claude: command not found` depois de um build
+
+`docker compose build` **não** substitui o Rebuild do Dev Container.
+
+O Compose constrói só o `Dockerfile`. Git, Node e o Claude Code entram por
+*features* do devcontainer, que são uma camada aplicada depois, e que o Compose
+sozinho não conhece — a imagem sai sem elas.
+
+`Ctrl+Shift+P` → **Dev Containers: Rebuild Container**.
+
+Regra prática: mexeu no `Dockerfile` ou no `devcontainer.json`, é Rebuild. `dcf
+build` serve para conferir que o Dockerfile compila, não para preparar o
+ambiente em que você vai trabalhar.
 
 ### Cards do Dashboard zerados
 

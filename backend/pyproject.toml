@@ -16,9 +16,16 @@ dependencies = [
   "python-multipart>=0.0.12",
   "structlog>=24.4",
   "sse-starlette>=2.1",
+  "opencv-python-headless>=4.10",
+  "numpy>=1.26,<3",
 ]
 
 [project.optional-dependencies]
+# Inferência de verdade. Sem isto o detector roda em passthrough — ver
+# `backend/requirements-vision.txt`.
+vision = [
+  "ultralytics>=8.3",
+]
 dev = [
   "pytest>=8.3",
   "pytest-asyncio>=0.24",
@@ -33,6 +40,10 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "UP", "B", "ASYNC", "S", "RUF"]
 ignore = ["S101"]
+# `×` (U+00D7) é o separador de resolução em todo o caminho do vídeo, do
+# MediaMTX à tela. Trocar por `x` faria a string do backend divergir do que o
+# broker e o M4TD reportam.
+allowed-confusables = ["×"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

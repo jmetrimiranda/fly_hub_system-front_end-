@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Response, status
+from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 
 from app.api.v1.deps import CollectionDep, FlightDep
@@ -17,6 +18,7 @@ from app.schemas.flight import (
     Telemetry,
 )
 from app.services.pipeline_service import PipelineService
+from app.services.video_service import MEDIA_TYPE, STREAM_HEADERS, VideoService
 
 router = APIRouter(prefix="/flight", tags=["voo"])
 
@@ -42,6 +44,23 @@ async def get_flight_status(service: FlightDep) -> FlightStatus:
 async def update_endpoint(payload: EndpointUpdate, service: FlightDep) -> FlightStatus:
     """Grava o endereço. O frontend informa; quem conecta de fato é o backend."""
     return await service.update_endpoint(payload)
+
+
+@router.get(
+    "/stream",
+    summary="Vídeo com inferência (MJPEG)",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"multipart/x-mixed-replace": {}}}},
+)
+async def stream_video() -> StreamingResponse:
+    """Quadro **depois** da inferência, com a sobreposição do operador.
+
+    Enquanto a resposta estiver aberta o backend consome o RTSP; fechada a
+    aba, o leitor libera a conexão sozinho. Sem sinal a resposta não encerra:
+    passa a emitir um quadro sintético com o motivo, a ~1 fps, e volta ao vídeo
+    quando o stream voltar — sem o navegador precisar reconectar.
+    """
+    return StreamingResponse(VideoService.frames(), media_type=MEDIA_TYPE, headers=STREAM_HEADERS)
 
 
 @router.get(

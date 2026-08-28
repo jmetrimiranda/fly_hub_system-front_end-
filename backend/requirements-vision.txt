@@ -1,0 +1,13 @@
+# Inferência de verdade — opcional.
+#
+# `ultralytics` arrasta torch (~2,5 GB). A aplicação sobe e funciona sem ele:
+# o detector responde em passthrough, devolvendo o quadro intacto e nenhuma
+# detecção, e a tela diz `SEM MODELO — vídeo cru`. Instale só onde houver
+# pesos treinados para rodar:
+#
+#     pip install -r requirements-vision.txt
+#
+# O import é preguiçoso (dentro de `Detector._load`), então instalar ou
+# remover isto não exige mexer em código.
+-r requirements.txt
+ultralytics>=8.3

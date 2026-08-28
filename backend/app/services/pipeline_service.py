@@ -6,12 +6,12 @@ local, fila, serviço remoto) não deve mudar nada acima desta classe.
 """
 
 from datetime import UTC, datetime
-from pathlib import Path
 
 from app.core.config import settings
 from app.core.errors import ConflictError
 from app.core.events import bus
 from app.core.logging import get_logger
+from app.integrations.vision import detector
 from app.models.enums import PipelineStatus
 from app.schemas.flight import PipelineState
 
@@ -26,26 +26,32 @@ class PipelineService:
     _message: str | None = None
 
     @classmethod
-    def _weights_path(cls) -> Path:
-        return settings.models_dir / "best.pt"
-
-    @classmethod
     def state(cls) -> PipelineState:
-        weights = cls._weights_path()
-        loaded = weights.exists()
+        """O estado do modelo é o do detector, não a existência do arquivo.
+
+        Um `best.pt` presente numa máquina sem torch existe e não carrega — a
+        tela precisa distinguir "sem modelo" de "modelo não carregou". Aqui só
+        `status()` é consultado, que não faz I/O além de um `stat()`; quem pode
+        carregar os pesos é `VideoService.snapshot()`, fora do laço de eventos.
+        """
+        model = detector.status()
+        loaded = bool(model["loaded"])
         return PipelineState(
             status=cls._status,
             stream_path=settings.flyhub_stream_path,
             started_at=cls._started_at,
             model_loaded=loaded,
-            model_version=weights.stem if loaded else None,
-            message=cls._message
-            or (
-                None
-                if loaded
-                else "Nenhum arquivo de pesos encontrado. O vídeo passa em modo passthrough."
-            ),
+            model_version=model["weights_name"] if loaded else None,
+            message=cls._message or cls._model_message(model),
         )
+
+    @staticmethod
+    def _model_message(model: dict) -> str | None:
+        if model["loaded"]:
+            return None
+        if model["error"]:
+            return f"O modelo não carregou: {model['error']} O vídeo passa em modo passthrough."
+        return "Nenhum arquivo de pesos encontrado. O vídeo passa em modo passthrough."
 
     @classmethod
     async def start(cls) -> PipelineState:

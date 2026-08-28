@@ -68,6 +68,15 @@ por arquivo, do componente React até a persistência.
   `len(app.openapi()["paths"])`.
 - **Compilar não é validar.** `compileall` passa em código que estoura no import.
   Antes de dar algo por pronto: `python -c "from app.main import app"` e `pytest`.
+- **Valor fixo no bloco `environment:` do compose sobrepõe o `.env`, em
+  silêncio.** O sintoma é comportamento antigo sem mensagem de erro nenhuma.
+  Todo valor ali é repasse — `${VAR:-padrao}`, com o padrão sendo o que funciona
+  no Compose puro. Some-se a isso que o `env_file` é lido só na *criação* do
+  container: editar o `.env` com ele de pé não muda nada, e `restart` não
+  resolve, só `up -d --force-recreate`.
+- **`docker compose build` não substitui o Rebuild do Dev Container.** O Compose
+  constrói apenas o Dockerfile; as features (git, Node, Claude Code) vivem noutra
+  camada e somem. O sintoma é `claude: command not found`.
 
 ## Comandos
 

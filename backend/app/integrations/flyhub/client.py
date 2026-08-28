@@ -31,6 +31,8 @@ class StreamSnapshot:
     bitrate_mbps: float | None = None
     codec: str | None = None
     readers: int = 0
+    ready_seconds: int | None = None
+    """Há quanto tempo o path está publicando, pelo relógio do broker."""
 
 
 @dataclass(slots=True)
@@ -51,7 +53,12 @@ class FlightProbe:
 FAKE_PROBE = FlightProbe(
     broker_up=True,
     stream=StreamSnapshot(
-        ready=True, resolution="960x720", bitrate_mbps=0.41, codec="H264", readers=1
+        ready=True,
+        resolution="960×720",
+        bitrate_mbps=0.41,
+        codec="H264",
+        readers=1,
+        ready_seconds=0,
     ),
 )
 
@@ -75,22 +82,22 @@ class FlyHubClient:
 
         path = stream_path or settings.flyhub_stream_path
         try:
-            items = await self._media.list_paths()
+            info = await self._media.path_info(path)
         except FlyHubUnavailableError:
             return FlightProbe(broker_up=False)
 
-        info = next((item for item in items if item.get("name") == path), None)
         if info is None:
             return FlightProbe(broker_up=True)
 
-        track = (info.get("tracks") or [None])[0]
         return FlightProbe(
             broker_up=True,
             stream=StreamSnapshot(
-                ready=bool(info.get("ready")),
-                codec=track if isinstance(track, str) else None,
-                bitrate_mbps=round((info.get("bytesReceived", 0) * 8) / 1e6, 2) or None,
-                readers=len(info.get("readers", [])),
+                ready=info.ready,
+                resolution=info.resolution,
+                bitrate_mbps=info.mbps,
+                codec=info.codec,
+                readers=info.readers,
+                ready_seconds=info.ready_seconds,
             ),
         )
 

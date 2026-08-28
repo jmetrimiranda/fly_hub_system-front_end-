@@ -8,6 +8,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
+from urllib.parse import urlparse
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -39,19 +40,31 @@ class Settings(BaseSettings):
     flyhub_stream_path: str = "live/m4td"
     mediamtx_api_url: str = "http://mediamtx:9997"
     mediamtx_rtsp_url: str = "rtsp://mediamtx:8554"
+    # Endereço fixo que o operador cola no FlightHub. O M4TD deixou de depender
+    # do túnel: com PUBLIC_HOST definido o endereço não muda entre reinícios.
+    # Vazio faz o endereço ser montado com o host do próprio MediaMTX.
+    flyhub_public_host: str = ""
     tunnel_enabled: bool = False
     tunnel_public_host: str = ""
 
     # Fonte de telemetria de voo
     # `fake` é o padrão de propósito: quem clona o repositório vê a aplicação
     # inteira funcionando — drone, decolagem, mapa — sem hardware nenhum.
-    # `mqtt` é o lugar reservado para o FlightHub Sync, ainda não implementado.
-    flight_source: Literal["fake", "mqtt"] = "fake"
+    # `real` consulta o MediaMTX de verdade e consome o RTSP; a posição GPS
+    # continua ausente até o FlightHub Sync entrar, e é isso que `mqtt` reserva.
+    flight_source: Literal["fake", "real", "mqtt"] = "fake"
     fake_flight_interval: float = 1.0
     fake_flight_speed_ms: float = 6.0
     # Terminal Marítimo de Ponta Ubu, Anchieta/ES.
     fake_flight_center_lat: float = -20.78667
     fake_flight_center_lon: float = -40.57333
+
+    # Vídeo e inferência
+    # Pesos ausentes não são erro: é o estado inicial do projeto, e o detector
+    # responde em passthrough. Ver `integrations/vision/detector.py`.
+    model_weights: Path | None = None
+    model_conf: float = 0.25
+    jpeg_quality: int = 80
 
     # Armazenamento
     data_root: Path = Path("/data")
@@ -69,6 +82,12 @@ class Settings(BaseSettings):
     roboflow_workspace: str = ""
     roboflow_project: str = ""
     roboflow_api_url: str = "https://api.roboflow.com"
+
+    @field_validator("model_weights", mode="before")
+    @classmethod
+    def _blank_is_unset(cls, value: str | Path | None) -> str | Path | None:
+        """`MODEL_WEIGHTS=` no .env significa "use o padrão", não `Path(".")`."""
+        return value or None
 
     @field_validator("cors_origins", mode="before")
     @classmethod
@@ -95,10 +114,37 @@ class Settings(BaseSettings):
         return bool(self.roboflow_api_key and self.roboflow_workspace and self.roboflow_project)
 
     @property
+    def mediamtx_host(self) -> str:
+        """Host de `MEDIAMTX_API_URL`. É onde o broker realmente está."""
+        return urlparse(self.mediamtx_api_url).hostname or self.flyhub_rtmp_host
+
+    @property
     def rtmp_publish_url(self) -> str:
-        """Endereço que o operador cola no FlightHub 2 para publicar o stream."""
-        host = self.tunnel_public_host or f"{self.flyhub_rtmp_host}:{self.flyhub_rtmp_port}"
+        """Endereço que o operador cola no FlightHub 2 para publicar o stream.
+
+        Ordem de precedência: o host público fixo, depois o túnel (que muda a
+        cada reinício), depois o host do próprio broker. O primeiro é o modo
+        que o M4TD passou a usar — endereço estável entre reinícios.
+        """
+        host = self.flyhub_public_host or self.tunnel_public_host or self.mediamtx_host
+        if ":" not in host:
+            host = f"{host}:{self.flyhub_rtmp_port}"
         return f"rtmp://{host}/{self.flyhub_stream_path}"
+
+    @property
+    def rtsp_url(self) -> str:
+        """Endereço que o leitor de quadros consome."""
+        return f"{self.mediamtx_rtsp_url.rstrip('/')}/{self.flyhub_stream_path}"
+
+    @property
+    def weights_path(self) -> Path:
+        """Arquivo de pesos do detector. Pode não existir — e isso é normal."""
+        return self.model_weights or (self.models_dir / "best.pt")
+
+    @property
+    def video_enabled(self) -> bool:
+        """Só a fonte real consome RTSP; `fake` não tem broker para ler."""
+        return self.flight_source != "fake"
 
 
 @lru_cache

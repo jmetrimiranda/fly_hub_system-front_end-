@@ -11,6 +11,19 @@ import type { CollectionSession, FlightStatus, PipelineState, Telemetry } from "
 export const flightService = {
   getStatus: () => api.get<FlightStatus>("/flight/status").then((r) => r.data),
 
+  /**
+   * URL do vídeo com inferência. O `<img>` do player fala direto com o
+   * backend — MJPEG não passa pelo axios —, mas o endereço continua saindo
+   * daqui: componente não monta string de API.
+   *
+   * `attempt` existe para o botão de tentar de novo: a URL precisa mudar para
+   * o navegador reabrir a conexão em vez de reaproveitar a que falhou.
+   */
+  streamUrl: (attempt = 0): string => {
+    const base = (api.defaults.baseURL ?? "/api/v1").replace(/\/$/, "");
+    return attempt > 0 ? `${base}/flight/stream?tentativa=${attempt}` : `${base}/flight/stream`;
+  },
+
   setEndpoint: (endpoint: string) =>
     api.put<FlightStatus>("/flight/endpoint", { endpoint }).then((r) => r.data),
 
