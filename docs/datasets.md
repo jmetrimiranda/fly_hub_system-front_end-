@@ -312,6 +312,56 @@ e API no mesmo host e `VITE_API_BASE_URL` nem é definida. Lá a base é relativ
 | Dev Container / Compose | `http://localhost:8000/api/v1` | `http://localhost:8000/api/v1/datasets/13/images/3016/thumb` |
 | Produção (nginx) | não definida | `/api/v1/datasets/13/images/3016/thumb` |
 
+### Demonstração e voo, na mesma tabela
+
+A aplicação recém-clonada não pode abrir vazia — uma tela sem nada parece
+quebrada, e quem nunca viu o sistema não distingue as duas coisas. Por isso o
+`post-create.sh` roda o `seed.py`. Assim que voos reais entram, porém, as duas
+fontes convivem na mesma listagem.
+
+Cada linha carrega `source`, gravado no INSERT: `seed` ou `collected`. A marca
+não é deduzida por data, faixa de id ou padrão de nome — qualquer heurística
+desse tipo acerta hoje e erra no dia em que uma coleta real cair no meio dela.
+
+| Onde | O que acontece |
+| --- | --- |
+| Listagem e detalhe | selo **demonstração** ao lado da versão |
+| `python -m app.db.seed --clear` | remove só `source="seed"` |
+| Botão *Remover demonstração* | o mesmo, exigindo digitar `remover demonstração` |
+| `DELETE /api/v1/admin/seed` | a rota por trás do botão |
+
+A regra mora em `services/demo_data_service.py`, compartilhada pelo comando e
+pela rota: duas cópias divergiriam, e a que divergisse apagaria demais.
+
+O botão fica em `/admin/seed`, e não em `/datasets`, porque apagar o seed toca
+datasets, inspeções, notas e métricas ao mesmo tempo — uma rota de domínio
+mexendo nos outros três seria a fronteira errada.
+
+### Coleta vazia não deixa resíduo
+
+Uma sessão que iniciou e não gravou quadro nenhum não é um dataset: é uma
+tentativa. Mantê-la produzia uma linha de zero imagens que não dá para enviar ao
+Roboflow nem reparticionar — e, pior, **queimava o número da versão**, porque
+`next_version()` respeita tanto a pasta quanto a coluna `version`. Depois de
+três tentativas frustradas, a primeira coleta de verdade saía como `v0.6`.
+
+Ao encerrar — salvando ou cancelando — sem nenhum quadro, o serviço apaga a
+pasta e o registro, publica `collection.discarded` e registra o motivo no log. O
+número volta a ficar livre.
+
+Cancelar uma coleta **com** quadros continua preservando tudo: um clique não
+pode destruir um voo. O descarte automático vale só quando não há o que perder.
+
+Para o resíduo anterior a esta regra:
+
+```bash
+python -m app.db.maintenance prune-empty
+```
+
+A guarda é dupla — contador zerado **e** `raw/` vazio em disco. As duas fontes
+discordam justamente quando o banco perdeu uma linha, e apagar guiado só pelo
+contador destruiria um voo que existe em disco.
+
 ### Excluir muda a proporção
 
 Tirar 40 imagens de `train` desloca a divisão de 70/15/15 para outra coisa. O

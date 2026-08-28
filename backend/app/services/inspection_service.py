@@ -53,6 +53,7 @@ class InspectionService:
                     damage_count=inspection.damage_count,
                     open_note_count=open_count,
                     status=inspection.status,
+                    source=inspection.source,
                 )
                 for inspection, open_count in rows
             ],
@@ -80,6 +81,7 @@ class InspectionService:
             damage_count=inspection.damage_count,
             open_note_count=sum(1 for note in inspection.notes if note.status == NoteStatus.OPEN),
             status=inspection.status,
+            source=inspection.source,
             model_version=inspection.model_version,
             asset_tag=inspection.asset_tag,
             damages=[DamageOut.model_validate(damage) for damage in inspection.damages],

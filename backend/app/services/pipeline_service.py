@@ -41,6 +41,7 @@ class PipelineService:
             stream_path=settings.flyhub_stream_path,
             started_at=cls._started_at,
             model_loaded=loaded,
+            model_enabled=bool(model["enabled"]),
             model_version=model["weights_name"] if loaded else None,
             message=cls._message or cls._model_message(model),
         )
@@ -48,6 +49,11 @@ class PipelineService:
     @staticmethod
     def _model_message(model: dict) -> str | None:
         if model["loaded"]:
+            if not model["enabled"]:
+                return (
+                    "Os pesos estão carregados e a inferência está desligada: o vídeo passa "
+                    "cru, de propósito. Religar volta a detectar no quadro seguinte."
+                )
             return None
         if model["error"]:
             return f"O modelo não carregou: {model['error']} O vídeo passa em modo passthrough."

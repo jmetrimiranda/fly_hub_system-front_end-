@@ -1,12 +1,19 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Badge, Button, Table, Text } from "@chakra-ui/react";
-import { ChevronRight } from "lucide-react";
+import { Badge, Button, Flex, Input, Table, Text } from "@chakra-ui/react";
+import { ChevronRight, Trash2 } from "lucide-react";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
 import { SplitBar } from "@/components/ui/SplitBar";
+import { DemoBadge } from "@/components/ui/DemoBadge";
+import { Modal } from "@/components/ui/Modal";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { useDatasets } from "@/hooks/useDatasets";
+import { useClearDemoData, useDemoData } from "@/hooks/useDemoData";
 import { formatBytes, formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import type { RoboflowStatus } from "@/types/api";
+
+/** O operador digita isto para confirmar. Ver o modal, mais abaixo. */
+const CONFIRM_PHRASE = "remover demonstração";
 
 const ROBOFLOW_LABEL: Record<RoboflowStatus, { text: string; palette: string }> = {
   never_sent: { text: "nunca enviado", palette: "gray" },
@@ -18,7 +25,12 @@ const ROBOFLOW_LABEL: Record<RoboflowStatus, { text: string; palette: string }> 
 
 export function DatasetsPage() {
   const datasets = useDatasets();
+  const demo = useDemoData();
+  const clearDemo = useClearDemoData();
   const navigate = useNavigate();
+
+  const [clearing, setClearing] = useState(false);
+  const [typed, setTyped] = useState("");
 
   if (datasets.isLoading) return <LoadingState />;
   if (datasets.isError)
@@ -26,10 +38,35 @@ export function DatasetsPage() {
 
   const items = datasets.data?.items ?? [];
   const totalImages = items.reduce((sum, item) => sum + item.image_count, 0);
+  // O botão só aparece havendo o que remover: numa instalação que já saiu da
+  // demonstração ele seria um botão perigoso sem função.
+  const demoTotal =
+    (demo.data?.datasets ?? 0) +
+    (demo.data?.inspections ?? 0) +
+    (demo.data?.model_metrics ?? 0) +
+    (demo.data?.sap_notes ?? 0);
+
+  const closeClearing = () => {
+    setClearing(false);
+    setTyped("");
+  };
 
   return (
+    <>
     <SurfaceCard
       title={`Datasets · ${items.length} versão(ões) · ${formatNumber(totalImages)} imagens`}
+      action={
+        demoTotal > 0 && (
+          <Button
+            size="xs"
+            variant="outline"
+            colorPalette="orange"
+            onClick={() => setClearing(true)}
+          >
+            <Trash2 size={14} /> Remover demonstração
+          </Button>
+        )
+      }
     >
       {items.length === 0 ? (
         <EmptyState
@@ -63,9 +100,12 @@ export function DatasetsPage() {
                   onClick={() => navigate(`/datasets/${dataset.id}`)}
                 >
                   <Table.Cell>
-                    <Text textStyle="readout" fontWeight="700" color="accent.solid">
-                      {dataset.version}
-                    </Text>
+                    <Flex align="center" gap={2}>
+                      <Text textStyle="readout" fontWeight="700" color="accent.solid">
+                        {dataset.version}
+                      </Text>
+                      <DemoBadge source={dataset.source} />
+                    </Flex>
                   </Table.Cell>
                   <Table.Cell>
                     <Text textStyle="readout" fontSize="sm">
@@ -107,5 +147,42 @@ export function DatasetsPage() {
         </Table.Root>
       )}
     </SurfaceCard>
+
+    {/* Irreversível, e atravessa três telas de uma vez: exige digitar a frase,
+        do mesmo jeito que excluir um dataset exige digitar a versão. */}
+    <Modal
+      open={clearing}
+      onClose={closeClearing}
+      title="Remover os dados de demonstração?"
+      confirmLabel="Remover demonstração"
+      tone="danger"
+      confirmDisabled={typed.trim() !== CONFIRM_PHRASE}
+      confirmLoading={clearDemo.isPending}
+      onConfirm={() => clearDemo.mutate(undefined, { onSuccess: closeClearing })}
+    >
+      <Flex direction="column" gap={3}>
+        <Text fontSize="sm">
+          Serão apagados {formatNumber(demo.data?.datasets ?? 0)} dataset(s),{" "}
+          {formatNumber(demo.data?.inspections ?? 0)} inspeção(ões),{" "}
+          {formatNumber(demo.data?.sap_notes ?? 0)} nota(s) SAP e{" "}
+          {formatNumber(demo.data?.model_metrics ?? 0)} métrica(s) — tudo que o{" "}
+          <code>seed.py</code> criou, e nada além disso.
+        </Text>
+        <Text fontSize="sm" color="fg.muted">
+          As coletas de voo permanecem. A separação não é por data nem por nome: cada linha carrega
+          a marca de origem desde que foi gravada.
+        </Text>
+        <Text fontSize="sm" color="fg.muted">
+          Para confirmar, digite <b>{CONFIRM_PHRASE}</b>:
+        </Text>
+        <Input
+          size="sm"
+          value={typed}
+          placeholder={CONFIRM_PHRASE}
+          onChange={(event) => setTyped(event.target.value)}
+        />
+      </Flex>
+    </Modal>
+    </>
   );
 }

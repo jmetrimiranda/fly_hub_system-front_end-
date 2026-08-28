@@ -24,10 +24,21 @@ interface Props {
 
 type Phase = "loading" | "playing" | "error";
 
-/** O badge tem três estados, e nenhum deles é silêncio (ver ADR do detector). */
+/**
+ * O badge nunca fica em silêncio, e é por isso que ele tem quatro rótulos.
+ *
+ * Os três primeiros são causas diferentes para a **mesma imagem**: vídeo cru,
+ * sem caixa nenhuma. Sem pesos, com pesos que não carregaram, e com pesos
+ * carregados e a inferência desligada de propósito. Quem olha a tela precisa
+ * saber em qual dos três está — ver vídeo cru achando que o modelo não achou
+ * nada é pior que não ver vídeo.
+ */
 function modelBadge(metrics: ConnectionMetrics): { tone: "live" | "warn" | "down"; label: string } {
-  if (metrics.model_loaded) {
+  if (metrics.model_loaded && metrics.model_enabled) {
     return { tone: "live", label: `MODELO ${metrics.model_version ?? "ativo"}` };
+  }
+  if (metrics.model_loaded) {
+    return { tone: "warn", label: "MODELO DESLIGADO — vídeo cru" };
   }
   if (metrics.model_error) {
     return { tone: "down", label: "MODELO NÃO CARREGOU — vídeo cru" };

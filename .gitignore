@@ -21,10 +21,21 @@ dist/
 *.pem
 *.key
 
-# Dados operacionais (imagens, datasets, pesos)
+# Dados operacionais (imagens, datasets)
 data/
 !data/.gitkeep
 *.glb.backup
+
+# Pesos do modelo: dezenas de MB, trocados a cada treino. No Git comum o
+# repositório incharia e todo clone pagaria por cada treino já feito, para
+# sempre. O que é versionado é o notebook que os produz. Ver models/README.md.
+models/*
+!models/.gitkeep
+!models/README.md
+
+# Artefatos de treino que o Ultralytics gera onde o notebook rodar
+runs/
+*.ipynb_checkpoints/
 
 # Docs build
 site/

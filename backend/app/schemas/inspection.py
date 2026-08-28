@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from app.models.enums import InspectionStatus
+from app.models.enums import DataSource, InspectionStatus
 from app.schemas.common import ApiModel
 
 
@@ -24,6 +24,8 @@ class InspectionSummary(ApiModel):
     damage_count: int
     open_note_count: int = 0
     status: InspectionStatus
+    source: DataSource = DataSource.COLLECTED
+    """`seed` rende o selo *demonstração* na tela."""
 
 
 class InspectionDetail(InspectionSummary):

@@ -31,6 +31,14 @@ export const keys = {
     roboflow: (id: number) => [...keys.datasets.detail(id), "roboflow"] as const,
     credentials: () => [...keys.datasets.all, "credentials"] as const,
   },
+  model: {
+    all: ["model"] as const,
+    state: () => [...keys.model.all, "state"] as const,
+  },
+  admin: {
+    all: ["admin"] as const,
+    demo: () => [...keys.admin.all, "demo"] as const,
+  },
   inspections: {
     all: ["inspections"] as const,
     list: (page: number) => [...keys.inspections.all, "list", page] as const,

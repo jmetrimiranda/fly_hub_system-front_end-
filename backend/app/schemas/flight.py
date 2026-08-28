@@ -54,6 +54,10 @@ class ConnectionMetrics(ApiModel):
     stream_uptime_seconds: int = 0
     codec: str | None = None
     model_loaded: bool = False
+    model_enabled: bool = True
+    """Inferência ligada pelo operador. Ortogonal a `model_loaded`: pesos
+    carregados com a inferência desligada dão vídeo cru — e o badge precisa
+    dizer que foi escolha, não ausência de modelo."""
     model_version: str | None = None
     model_error: str | None = None
     """Preenchido só no terceiro estado: havia pesos, mas a carga falhou."""
@@ -203,5 +207,6 @@ class PipelineState(ApiModel):
     stream_path: str
     started_at: datetime | None = None
     model_loaded: bool = False
+    model_enabled: bool = True
     model_version: str | None = None
     message: str | None = None

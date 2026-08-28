@@ -15,6 +15,7 @@ const metrics = (overrides: Partial<ConnectionMetrics> = {}): ConnectionMetrics 
   stream_uptime_seconds: 42,
   codec: "H264",
   model_loaded: false,
+  model_enabled: true,
   model_version: null,
   model_error: null,
   resolution_change: null,
@@ -53,6 +54,15 @@ describe("InferenceStream", () => {
   it("com pesos carregados, o badge nomeia o arquivo", () => {
     renderStream(true, { model_loaded: true, model_version: "best.pt" });
     expect(screen.getByText("MODELO best.pt")).toBeInTheDocument();
+  });
+
+  it("inferência desligada não é o mesmo que não ter modelo", () => {
+    // Os dois casos dão a mesma imagem — vídeo cru, sem caixa. O badge é a
+    // única coisa que separa "escolhi desligar" de "não há peso nenhum".
+    renderStream(true, { model_loaded: true, model_enabled: false, model_version: "best.pt" });
+
+    expect(screen.getByText("MODELO DESLIGADO — vídeo cru")).toBeInTheDocument();
+    expect(screen.queryByText("SEM MODELO — vídeo cru")).not.toBeInTheDocument();
   });
 
   it("pesos que existem mas não carregam são o terceiro estado", () => {

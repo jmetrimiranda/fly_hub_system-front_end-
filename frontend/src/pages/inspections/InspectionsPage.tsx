@@ -1,5 +1,6 @@
-import { Grid, GridItem, Table, Text } from "@chakra-ui/react";
+import { Flex, Grid, GridItem, Table, Text } from "@chakra-ui/react";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";
 import { TimeSeriesChart } from "@/components/charts/TimeSeriesChart";
 import { DamageRatioChart } from "@/components/charts/DamageRatioChart";
@@ -50,9 +51,12 @@ export function InspectionsPage() {
                 {list.data.items.map((inspection) => (
                   <Table.Row key={inspection.id}>
                     <Table.Cell>
-                      <Text textStyle="readout" fontSize="sm" fontWeight="700">
-                        {inspection.code}
-                      </Text>
+                      <Flex align="center" gap={2}>
+                        <Text textStyle="readout" fontSize="sm" fontWeight="700">
+                          {inspection.code}
+                        </Text>
+                        <DemoBadge source={inspection.source} />
+                      </Flex>
                     </Table.Cell>
                     <Table.Cell>
                       <Text textStyle="readout" fontSize="sm">

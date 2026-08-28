@@ -161,19 +161,30 @@ class VideoStream:
             )
 
     def _hud(self, image: Any, frame: Frame, detections: int) -> None:
-        """Faixa preta no topo: FPS, resolução, contador e o modo do modelo."""
+        """Faixa preta no topo: FPS, resolução, contador e o modo do modelo.
+
+        Três textos, não dois: "sem modelo" e "modelo desligado" parecem a
+        mesma coisa no vídeo — quadro cru, nenhuma caixa — e são causas
+        opostas. Quem grava a tela para revisar depois precisa saber qual dos
+        dois estava valendo.
+        """
         width, height = frame.size
-        loaded = self._detector.is_loaded
-        mode = "modelo ativo" if loaded else "sem modelo"
+        active = self._detector.is_active
+        if active:
+            mode = "modelo ativo"
+        elif self._detector.is_loaded:
+            mode = "modelo desligado"
+        else:
+            mode = "sem modelo"
         left = f"{self._reader.capture_fps:.1f} fps  {width}×{height}  #{frame.seq}"
-        right = f"{mode}  {detections} det" if loaded else mode
+        right = f"{mode}  {detections} det" if active else mode
 
         cv2.rectangle(image, (0, 0), (width, HUD_HEIGHT), (0, 0, 0), -1)
         cv2.putText(
             image, left, (8, 18), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (230, 237, 243), 1, cv2.LINE_AA
         )
         (text_width, _), _ = cv2.getTextSize(right, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 1)
-        color = (80, 200, 120) if loaded else (34, 153, 210)
+        color = (80, 200, 120) if active else (34, 153, 210)
         cv2.putText(
             image,
             right,

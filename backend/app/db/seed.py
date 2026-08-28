@@ -1,9 +1,20 @@
 """Dados de demonstração para desenvolvimento.
 
-Permite abrir o Dashboard e as três páginas com conteúdo real logo depois de
+Permite abrir o Dashboard e as três páginas com conteúdo logo depois de
 `docker compose up`, sem depender de um drone conectado.
+
+Tudo que sai daqui é gravado com `source="seed"`. É essa marca — e não a data,
+o id ou o formato do código — que permite remover a demonstração depois sem
+tocar em voo de verdade:
+
+    python -m app.db.seed            popula
+    python -m app.db.seed --clear    remove só o que o seed criou
+
+A regra do `--clear` mora em `services/demo_data_service.py`, compartilhada com
+o `DELETE /api/v1/admin/seed` que a tela Datasets aciona.
 """
 
+import argparse
 import asyncio
 import random
 from datetime import UTC, datetime, timedelta
@@ -11,7 +22,14 @@ from datetime import UTC, datetime, timedelta
 from app.core.logging import configure_logging, get_logger
 from app.db.session import SessionLocal, engine
 from app.models import Base, Damage, Dataset, DatasetImage, Inspection, ModelMetric, SapNote
-from app.models.enums import CollectionStatus, InspectionStatus, NoteStatus, RoboflowStatus
+from app.models.enums import (
+    CollectionStatus,
+    DataSource,
+    InspectionStatus,
+    NoteStatus,
+    RoboflowStatus,
+)
+from app.services.demo_data_service import DemoDataService
 from app.services.splitting import SplitConfig, assign_temporal_splits
 
 log = get_logger(__name__)
@@ -37,6 +55,7 @@ async def seed() -> None:
                 status=InspectionStatus.COMPLETED,
                 model_version="yolo-v8n-2026.07",
                 asset_tag=f"LT-{random.randint(100, 180)}",
+                source=DataSource.SEED,
             )
             session.add(inspection)
             await session.flush()
@@ -59,6 +78,7 @@ async def seed() -> None:
                         status=NoteStatus.OPEN if random.random() < 0.7 else NoteStatus.CLOSED,
                         opened_at=at + timedelta(hours=2),
                         description="Avaria detectada em inspeção automatizada.",
+                        source=DataSource.SEED,
                     )
                 )
 
@@ -69,6 +89,7 @@ async def seed() -> None:
                 value=4.72,
                 measured_at=now,
                 is_current=True,
+                source=DataSource.SEED,
             )
         )
 
@@ -86,6 +107,7 @@ async def seed() -> None:
                 storage_path=f"/data/datasets/collection_{started:%Y-%m-%d_%H-%M-%S}",
                 roboflow_status=RoboflowStatus.SENT if index < 2 else RoboflowStatus.NEVER_SENT,
                 roboflow_sent_at=now if index < 2 else None,
+                source=DataSource.SEED,
             )
             session.add(dataset)
             await session.flush()
@@ -113,9 +135,49 @@ async def seed() -> None:
             dataset.embargo_seconds = SplitConfig().embargo_seconds
 
         await session.commit()
-        log.info("seed_completed", inspections=45, datasets=4)
+        # Em nível de aviso de propósito: quem sobe o ambiente precisa ler, no
+        # meio do log do post-create, que o que está na tela não é voo.
+        log.warning(
+            "seed_completed",
+            inspections=45,
+            datasets=4,
+            source=str(DataSource.SEED),
+            aviso=(
+                "Estes são dados de DEMONSTRAÇÃO, não coletas reais. "
+                "Remova com: python -m app.db.seed --clear"
+            ),
+        )
+
+
+async def clear() -> None:
+    """Remove o que o seed criou. Coleta real não é tocada."""
+    async with SessionLocal() as session:
+        removed = await DemoDataService(session).clear()
+    log.info(
+        "seed_cleared",
+        datasets=removed.datasets,
+        inspections=removed.inspections,
+        model_metrics=removed.model_metrics,
+        sap_notes=removed.sap_notes,
+    )
+    print(
+        f"Removidos: {removed.datasets} dataset(s), {removed.inspections} inspeção(ões), "
+        f"{removed.sap_notes} nota(s) SAP e {removed.model_metrics} métrica(s) de demonstração.\n"
+        "Datasets e inspeções coletados de verdade permanecem."
+    )
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Dados de demonstração da plataforma.")
+    parser.add_argument(
+        "--clear",
+        action="store_true",
+        help="remove os dados de demonstração em vez de criá-los",
+    )
+    args = parser.parse_args()
+    configure_logging()
+    asyncio.run(clear() if args.clear else seed())
 
 
 if __name__ == "__main__":
-    configure_logging()
-    asyncio.run(seed())
+    main()

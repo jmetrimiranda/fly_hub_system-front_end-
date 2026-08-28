@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Box, Button, Flex, Grid, GridItem, Input, Table, Text } from "@chakra-ui/react";
 import { Copy, Play, Square, TriangleAlert } from "lucide-react";
 import { CollectionPanel } from "@/components/collection/CollectionPanel";
+import { ModelPanel } from "@/components/model/ModelPanel";
 import { InferenceStream } from "@/components/video/InferenceStream";
 import { StatCard } from "@/components/ui/StatCard";
 import { SurfaceCard } from "@/components/ui/SurfaceCard";
@@ -92,6 +93,11 @@ export function FlightPage() {
         <GridItem>
           <Flex direction="column" gap={4}>
             <CollectionPanel />
+
+            {/* Modelo antes do Pipeline: é o painel que muda sozinho quando
+                alguém entrega um peso novo, e é o que se olha primeiro ao
+                receber um. */}
+            <ModelPanel />
 
             <SurfaceCard title="Pipeline" padding={5}>
               <Flex align="center" gap={2} mb={3}>

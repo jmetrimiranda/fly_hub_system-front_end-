@@ -1,0 +1,13 @@
+# Saída do Jupyter: ruído de diff, e às vezes carrega chave de API na saída
+# de uma célula. O que vale versionar é o notebook, não o que ele imprimiu.
+.ipynb_checkpoints/
+
+# Artefatos de treino. O Ultralytics grava runs/detect/<nome>/ com pesos,
+# curvas e matriz de confusão — dezenas de MB por treino. O que a aplicação
+# consome são os dois arquivos copiados para models/, e esses também não vão
+# para o Git. Ver models/README.md.
+runs/
+datasets/
+*.pt
+*.onnx
+wandb/

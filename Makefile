@@ -16,6 +16,12 @@ logs: ## Segue os logs do backend
 seed: ## Popula o banco com dados de demonstração
 	$(COMPOSE) exec backend python -m app.db.seed
 
+seed-clear: ## Remove os dados de demonstração (coletas reais permanecem)
+	$(COMPOSE) exec backend python -m app.db.seed --clear
+
+prune-empty: ## Remove coletas encerradas sem nenhuma imagem
+	$(COMPOSE) exec backend python -m app.db.maintenance prune-empty
+
 migrate: ## Aplica as migrations
 	$(COMPOSE) exec backend alembic upgrade head
 
@@ -36,4 +42,4 @@ docs: ## Serve a documentação MkDocs em http://localhost:8001
 docs-build: ## Gera o site estático da documentação em ./site
 	$(COMPOSE) run --rm docs mkdocs build --strict
 
-.PHONY: help up down logs seed migrate revision test lint docs docs-build
+.PHONY: help up down logs seed seed-clear prune-empty migrate revision test lint docs docs-build

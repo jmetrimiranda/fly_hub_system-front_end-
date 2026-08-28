@@ -69,7 +69,11 @@ class Settings(BaseSettings):
     # Armazenamento
     data_root: Path = Path("/data")
     datasets_dir: Path = Path("/data/datasets")
-    models_dir: Path = Path("/data/models")
+    # `models/` do repositório, montada no container. Fica **fora** de `/data`
+    # de propósito: `/data` é volume gerido pelo Docker, e a pessoa que treina
+    # precisa de uma pasta que exista na árvore do projeto, para copiar o
+    # arquivo sem saber o que é um volume. Ver `models/README.md`.
+    models_dir: Path = Path("/models")
     # Acima disto a coleta não inicia e uma coleta em andamento é pausada. O
     # disco cheio no meio de um voo é o modo de falha mais caro: o operador só
     # descobre depois de pousar.
@@ -176,6 +180,16 @@ class Settings(BaseSettings):
     def weights_path(self) -> Path:
         """Arquivo de pesos do detector. Pode não existir — e isso é normal."""
         return self.model_weights or (self.models_dir / "best.pt")
+
+    @property
+    def metrics_path(self) -> Path:
+        """`metrics.json` do treino, sempre ao lado dos pesos.
+
+        Derivado de `weights_path` em vez de configurável: os dois arquivos
+        saem juntos do notebook e são copiados juntos. Uma variável separada só
+        criaria a possibilidade de apontarem para treinos diferentes.
+        """
+        return self.weights_path.parent / "metrics.json"
 
     @property
     def video_enabled(self) -> bool:

@@ -12,6 +12,11 @@ export type PipelineStatus = "stopped" | "starting" | "running" | "error";
 export type RoboflowStatus = "never_sent" | "queued" | "uploading" | "sent" | "failed";
 export type SplitName = "train" | "valid" | "test";
 export type InspectionStatus = "processing" | "completed" | "failed";
+/**
+ * De onde a linha veio. `seed` rende o selo *demonstração* na tela — sem ele
+ * alguém trata dado fictício como voo e treina em cima dele.
+ */
+export type DataSource = "seed" | "collected";
 
 export interface Page<T> {
   items: T[];
@@ -65,6 +70,10 @@ export interface ConnectionMetrics {
   stream_uptime_seconds: number;
   codec: string | null;
   model_loaded: boolean;
+  /** Inferência ligada. Ortogonal a `model_loaded`: pesos carregados com a
+   *  inferência desligada dão vídeo cru — e o badge tem que dizer que foi
+   *  escolha, não ausência de modelo. */
+  model_enabled: boolean;
   model_version: string | null;
   /** Preenchido só no terceiro estado: havia pesos, mas a carga falhou. */
   model_error: string | null;
@@ -188,8 +197,68 @@ export interface PipelineState {
   stream_path: string;
   started_at: string | null;
   model_loaded: boolean;
+  model_enabled: boolean;
   model_version: string | null;
   message: string | null;
+}
+
+/* --- Modelo de visão ------------------------------------------------------ */
+
+export interface ClassMetric {
+  name: string;
+  map50: number | null;
+  map50_95: number | null;
+  precision: number | null;
+  recall: number | null;
+}
+
+/** O `metrics.json` que o treino produziu. Tudo opcional: o arquivo é escrito
+ *  por outra pessoa, noutra máquina, possivelmente por outra versão do
+ *  notebook. Campo ausente vira travessão na tela, não erro. */
+export interface TrainingMetrics {
+  map50: number | null;
+  map50_95: number | null;
+  precision: number | null;
+  recall: number | null;
+  classes: string[];
+  per_class: ClassMetric[];
+  trained_at: string | null;
+  base_model: string | null;
+  epochs: number | null;
+  dataset: string | null;
+  weights_sha256: string | null;
+  /** O treino conferiu se a partição do dataset baixado bateu com o split
+   *  temporal. `false` significa métrica provavelmente otimista (ADR 004). */
+  split_check_ok: boolean | null;
+}
+
+export interface ModelState {
+  loaded: boolean;
+  /** Inferência ligada pelo operador. Desligar **não** descarrega os pesos. */
+  enabled: boolean;
+  /** `loaded && enabled` — se o próximo quadro passa mesmo pelo modelo. */
+  active: boolean;
+  weights_path: string;
+  weights_name: string;
+  weights_exists: boolean;
+  classes: string[];
+  conf: number;
+  loaded_at: string | null;
+  /** Havia pesos e a carga falhou. O vídeo continua, em passthrough. */
+  error: string | null;
+  metrics: TrainingMetrics | null;
+  metrics_error: string | null;
+  /** Frase pronta para o operador. Sempre preenchida. */
+  message: string;
+}
+
+/* --- Manutenção ----------------------------------------------------------- */
+
+export interface DemoDataSummary {
+  datasets: number;
+  inspections: number;
+  model_metrics: number;
+  sap_notes: number;
 }
 
 /* --- Datasets ------------------------------------------------------------- */
@@ -230,6 +299,7 @@ export interface DatasetSummary {
   distribution: SplitDistribution;
   roboflow_status: RoboflowStatus;
   roboflow_sent_at: string | null;
+  source: DataSource;
 }
 
 export interface DatasetDetail extends DatasetSummary {
@@ -340,6 +410,7 @@ export interface InspectionSummary {
   damage_count: number;
   open_note_count: number;
   status: InspectionStatus;
+  source: DataSource;
 }
 
 export interface InspectionStatistics {

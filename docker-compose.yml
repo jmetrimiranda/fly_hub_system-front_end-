@@ -51,6 +51,10 @@ services:
       # o `up -d` recriá-lo. Vazio é válido — a aplicação sobe e recusa gravar
       # credencial do Roboflow, dizendo o motivo na tela.
       SECRET_KEY: "${SECRET_KEY:-}"
+      # Onde o peso entregue é lido. O volume `./models` abaixo é o que faz
+      # este caminho existir dentro do container. Ver models/README.md.
+      MODELS_DIR: "${MODELS_DIR:-/models}"
+      MODEL_WEIGHTS: "${MODEL_WEIGHTS:-/models/best.pt}"
     # O MediaMTX do M4TD roda no host, fora deste Compose. Em Linux o nome
     # `host.docker.internal` não existe por padrão — sem esta linha ele não
     # resolve e `FLIGHT_SOURCE=real` não acha o broker. É preferível ao IP da
@@ -60,6 +64,11 @@ services:
     volumes:
       - ./backend:/app
       - appdata:/data
+      # Pasta de entrega do modelo. Bind mount, e não volume nomeado, porque o
+      # ponto todo é que quem treina copie o arquivo para uma pasta da árvore
+      # do projeto — dentro de um volume gerido pelo Docker isso exigiria saber
+      # `docker cp`. Ver models/README.md.
+      - ./models:/models
     ports:
       - "8000:8000"
     depends_on:

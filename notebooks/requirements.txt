@@ -1,0 +1,9 @@
+# Dependências do TREINO — separadas do backend de propósito.
+#
+# `ultralytics` arrasta torch e torchvision, ~2,5 GB. A aplicação não precisa
+# de nada disso: sem pesos ela roda em passthrough, e com pesos o `Detector`
+# importa ultralytics preguiçosamente, dentro da função de carga. Instale só na
+# máquina que treina.
+ultralytics>=8.3.0
+roboflow>=1.1.0
+jupyterlab>=4.0

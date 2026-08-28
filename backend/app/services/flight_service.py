@@ -124,6 +124,7 @@ class FlightService:
             stream_uptime_seconds=video.uptime_seconds or stream.ready_seconds or 0,
             codec=stream.codec,
             model_loaded=snapshot.model_loaded,
+            model_enabled=snapshot.model_enabled,
             model_version=snapshot.model_version,
             model_error=snapshot.model_error,
             resolution_change=(

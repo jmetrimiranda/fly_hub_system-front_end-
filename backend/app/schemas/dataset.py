@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import CollectionStatus, RoboflowStatus, SplitName
+from app.models.enums import CollectionStatus, DataSource, RoboflowStatus, SplitName
 from app.schemas.common import ApiModel
 
 
@@ -34,6 +34,9 @@ class DatasetSummary(ApiModel):
     distribution: SplitDistribution
     roboflow_status: RoboflowStatus
     roboflow_sent_at: datetime | None = None
+    source: DataSource = DataSource.COLLECTED
+    """`seed` rende o selo *demonstração* na tela. Sem ele, alguém treina em
+    cima de dado fictício sem saber."""
 
 
 class DatasetImageOut(ApiModel):

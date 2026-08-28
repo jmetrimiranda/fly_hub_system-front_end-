@@ -326,6 +326,8 @@ class CollectionService:
                 "O gravador não está no ar — a coleta foi interrompida por um reinício "
                 "do backend. Os quadros continuam em raw/; use Refazer split no dataset."
             )
+        if not finished.records:
+            return await self._discard_empty(dataset, "nenhum quadro foi gravado")
         now = datetime.now(UTC)
         dataset.ended_at = now
         dataset.duration_seconds = int((now - _aware(dataset.started_at)).total_seconds())
@@ -381,6 +383,8 @@ class CollectionService:
             raise CollectionStateError("Nenhuma coleta em andamento.")
         status = recorder.status()
         await asyncio.to_thread(recorder.abort)
+        if status.saved == 0:
+            return await self._discard_empty(dataset, "cancelada antes do primeiro quadro")
         dataset.status = CollectionStatus.CANCELLED
         dataset.ended_at = datetime.now(UTC)
         dataset.image_count = status.saved
@@ -388,6 +392,58 @@ class CollectionService:
         await self._session.commit()
         await bus.publish("collection.cancelled", dataset_id=dataset.id)
         return CollectionSession.model_validate(dataset)
+
+
+    # --- resíduo --------------------------------------------------------------
+
+    async def _discard_empty(self, dataset: Dataset, reason: str) -> CollectionSession:
+        """Encerra uma coleta que não gravou quadro nenhum sem deixar rastro.
+
+        Uma sessão que iniciou e não salvou nada não é um dataset: é uma
+        tentativa. Mantê-la produz uma linha `v0.5` com zero imagens que não dá
+        para enviar ao Roboflow, não dá para reparticionar e não explica nada —
+        e, pior, **queima o número da versão**, porque `next_version()` respeita
+        tanto a pasta quanto a coluna `version`. Depois de três tentativas a
+        primeira coleta de verdade sai como `v0.6`, sem que nada tenha sido
+        coletado antes.
+
+        Apagar aqui é seguro justamente porque não há o que perder: sem quadro
+        em `raw/` não existe voo para recuperar. O `cancel()` de uma coleta com
+        imagens continua preservando tudo — a diferença é essa, e é o que o
+        `reason` registra no log.
+        """
+        snapshot = CollectionSession.model_validate(dataset)
+        snapshot.status = CollectionStatus.CANCELLED
+        snapshot.image_count = 0
+        snapshot.disk_bytes = 0
+        snapshot.ended_at = datetime.now(UTC)
+
+        base = Path(dataset.storage_path)
+        version = dataset.version
+        dataset_id = dataset.id
+
+        await self._session.delete(dataset)
+        await self._session.commit()
+        await asyncio.to_thread(_remove_version, base)
+
+        await bus.publish("collection.discarded", dataset_id=dataset_id, version=version)
+        log.info(
+            "collection_discarded",
+            dataset_id=dataset_id,
+            version=version,
+            path=str(base),
+            motivo=reason,
+            versao_liberada=version,
+        )
+        return snapshot
+
+
+def _remove_version(base: Path) -> None:
+    """Apaga a pasta da versão descartada. Ausente já é o estado desejado."""
+    try:
+        storage.delete_version(base)
+    except OSError as exc:  # pragma: no cover — disco em estado incomum
+        log.warning("collection_discard_dir_falhou", path=str(base), error=str(exc))
 
 
 def _remove_empty(base: Path) -> None:

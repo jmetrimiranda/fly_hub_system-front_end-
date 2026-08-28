@@ -7,9 +7,13 @@ React 19 · FastAPI · PostgreSQL · Docker · MkDocs
 
 ---
 
-> **Para subir o sistema, leia [`starting_aplication.md`](starting_aplication.md).**
+> **Para subir o sistema, leia [Como rodar a aplicação](docs/rodar/index.md).**
 > O `docker compose up` abaixo não é suficiente: o backend precisa ser
 > iniciado à mão dentro do Dev Container.
+>
+> **Para entregar um modelo treinado, leia
+> [Onde colocar o peso do modelo](docs/modelo/index.md).** São cinco passos e
+> nenhum deles mexe na aplicação.
 
 ## Início rápido
 
@@ -25,7 +29,9 @@ docker compose up
 | Documentação | <http://localhost:8001> |
 
 No GitHub Codespaces, abrir o repositório já sobe tudo: o `.devcontainer` cria
-o `.env`, aplica as migrations e popula dados de demonstração.
+o `.env`, aplica as migrations e popula dados de demonstração — marcados com o
+selo **demonstração** na tela, e removíveis com `python -m app.db.seed --clear`
+ou pelo botão em *Datasets*.
 
 ## O que o projeto faz
 

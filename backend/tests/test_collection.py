@@ -76,6 +76,20 @@ def frames(monkeypatch):
     return source
 
 
+@pytest.fixture
+def no_frames(monkeypatch):
+    """Gravador no ar com o leitor sem sinal — a coleta que não grava nada.
+
+    É o caso real: o operador inicia a coleta e o stream nunca chega. Forçar
+    isso pelo intervalo de amostragem não funcionaria, porque o primeiro quadro
+    disponível é salvo de imediato.
+    """
+    from app.integrations.vision import video
+
+    monkeypatch.setattr(video, "raw_frame", lambda: None)
+    monkeypatch.setattr(video, "start", lambda: None)
+
+
 # --- guarda -------------------------------------------------------------------
 
 
@@ -259,3 +273,77 @@ async def test_resuming_past_the_limit_keeps_recording(session, datasets_dir, fr
         assert recorder.status().status == CollectionStatus.RECORDING
     finally:
         recorder.abort()
+
+
+# --- coleta vazia -------------------------------------------------------------
+
+
+async def test_saving_without_a_single_frame_leaves_nothing_behind(
+    session, datasets_dir, no_frames
+):
+    """Uma tentativa que não gravou nada não é um dataset.
+
+    Mantê-la produziria uma linha de zero imagens que não dá para enviar, não
+    dá para reparticionar — e, pior, queimaria o número da versão: a coleta
+    seguinte sairia como `v0.1` sem nada ter sido coletado antes.
+    """
+    service = CollectionService(session, client=_FakeClient())
+    started = await service.start(
+        CollectionStart(interval_seconds=0.5, frame_limit=None, dedup=False)
+    )
+    base = datasets_dir / started.version
+
+    saved = await service.save()
+
+    assert saved.image_count == 0
+    assert saved.status == CollectionStatus.CANCELLED
+    assert not base.exists()  # nem pasta
+    assert (await service.current()) is None  # nem registro
+
+    from sqlalchemy import func, select
+
+    from app.models.dataset import Dataset
+
+    assert (await session.scalar(select(func.count(Dataset.id)))) == 0
+    # E o número da versão volta a ficar livre.
+    assert (await service.preflight()).next_version == started.version
+
+
+async def test_cancelling_before_the_first_frame_also_leaves_nothing(
+    session, datasets_dir, no_frames
+):
+    service = CollectionService(session, client=_FakeClient())
+    started = await service.start(
+        CollectionStart(interval_seconds=0.5, frame_limit=None, dedup=False)
+    )
+
+    await service.cancel()
+
+    assert not (datasets_dir / started.version).exists()
+    assert (await service.preflight()).next_version == started.version
+
+
+async def test_cancelling_with_frames_preserves_everything(session, datasets_dir, frames):
+    """A contrapartida: com quadros em `raw/`, cancelar não apaga nada.
+
+    Um clique em Cancelar não pode destruir um voo. O descarte automático vale
+    só quando não há o que perder.
+    """
+    service = CollectionService(session, client=_FakeClient())
+    started = await service.start(
+        CollectionStart(interval_seconds=0.5, frame_limit=None, dedup=False)
+    )
+    raw = datasets_dir / started.version / storage.RAW_DIR
+    try:
+        _wait_until(lambda: len(list(raw.glob("*.jpg"))) >= 1)
+    finally:
+        cancelled = await service.cancel()
+
+    assert cancelled.status == CollectionStatus.CANCELLED
+    assert raw.is_dir() and list(raw.glob("*.jpg"))
+
+    from sqlalchemy import func, select
+
+    from app.models.dataset import Dataset
+
+    assert (await session.scalar(select(func.count(Dataset.id)))) == 1

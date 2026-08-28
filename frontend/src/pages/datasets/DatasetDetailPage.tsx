@@ -3,6 +3,7 @@ import { Link as RouterLink, useParams } from "react-router-dom";
 import { Box, Button, Flex, Grid, Input, Progress, Tabs, Text } from "@chakra-ui/react";
 import { ArrowLeft, RefreshCw, Trash2, TriangleAlert, Upload, X } from "lucide-react";
 import { ImageGallery } from "@/components/datasets/ImageGallery";
+import { DemoBadge } from "@/components/ui/DemoBadge";
 import { RoboflowUploadModal } from "@/components/datasets/RoboflowUploadModal";
 import { Modal } from "@/components/ui/Modal";
 import { SplitBar } from "@/components/ui/SplitBar";
@@ -56,6 +57,7 @@ export function DatasetDetailPage() {
           <Text fontSize="lg" fontWeight="700" textStyle="readout" color="accent.solid">
             {data.version}
           </Text>
+          <DemoBadge source={data.source} />
         </Flex>
         <Flex gap={2}>
           <Button

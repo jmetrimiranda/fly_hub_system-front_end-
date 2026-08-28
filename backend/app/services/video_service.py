@@ -37,6 +37,8 @@ class VideoSnapshot:
 
     stats: VideoStats
     model_loaded: bool
+    model_enabled: bool
+    """Inferência ligada. Ortogonal a `model_loaded` — ver o detector."""
     model_version: str | None
     model_error: str | None
 
@@ -60,6 +62,7 @@ class VideoService:
         return VideoSnapshot(
             stats=video.stats(),
             model_loaded=bool(status["loaded"]),
+            model_enabled=bool(status["enabled"]),
             model_version=status["weights_name"] if status["loaded"] else None,
             model_error=status["error"],
         )

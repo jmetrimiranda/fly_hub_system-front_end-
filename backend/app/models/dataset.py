@@ -12,11 +12,11 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SourceMixin, TimestampMixin
 from app.models.enums import CollectionStatus, RoboflowStatus, SplitName
 
 
-class Dataset(Base, TimestampMixin):
+class Dataset(Base, SourceMixin, TimestampMixin):
     """Uma sessão de coleta. Vira uma versão (v0.0, v0.1, …) na página Datasets."""
 
     __tablename__ = "datasets"

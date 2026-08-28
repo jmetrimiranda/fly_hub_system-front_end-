@@ -75,6 +75,7 @@ def _to_summary(dataset: Dataset) -> DatasetSummary:
         distribution=_distribution(dataset),
         roboflow_status=dataset.roboflow_status,
         roboflow_sent_at=dataset.roboflow_sent_at,
+        source=dataset.source,
     )
 
 
@@ -260,6 +261,60 @@ class DatasetService:
         await self._session.delete(dataset)
         await self._session.commit()
         log.info("dataset_deleted", dataset_id=dataset_id, version=dataset.version)
+
+    async def prune_empty(self) -> list[str]:
+        """Remove coletas encerradas que não têm imagem nenhuma. Devolve as versões.
+
+        Resíduo de antes de o descarte automático existir: `v0.4`, `v0.5` e
+        `v0.6` eram sessões que iniciaram e não salvaram quadro nenhum. Cada
+        uma ocupa um número de versão que `next_version()` respeita, então a
+        primeira coleta de verdade depois delas sai três números à frente sem
+        nada ter sido coletado.
+
+        A guarda é dupla — `image_count == 0` **e** `raw/` vazio em disco —
+        porque as duas fontes discordam justamente quando o banco perdeu uma
+        linha: apagar guiado só pelo contador destruiria um voo que existe em
+        disco. Coleta em andamento nunca entra: só `saved` e `cancelled`.
+        """
+        rows = (
+            await self._session.execute(
+                select(Dataset).where(
+                    Dataset.image_count == 0,
+                    Dataset.status.in_((CollectionStatus.SAVED, CollectionStatus.CANCELLED)),
+                )
+            )
+        ).scalars().all()
+
+        removed: list[str] = []
+        for dataset in rows:
+            base = Path(dataset.storage_path)
+            if base.is_dir() and await asyncio.to_thread(storage.live_counts, base) != {
+                "train": 0,
+                "valid": 0,
+                "test": 0,
+                "raw": 0,
+                "total": 0,
+            }:
+                log.warning(
+                    "dataset_vazio_com_arquivos",
+                    version=dataset.version,
+                    path=str(base),
+                    motivo="há imagens em disco que o banco não conhece — não foi removido",
+                )
+                continue
+            if base.is_dir():
+                await asyncio.to_thread(storage.delete_version, base)
+            await self._session.delete(dataset)
+            removed.append(dataset.version)
+            log.info(
+                "dataset_vazio_removido",
+                version=dataset.version,
+                path=str(base),
+                motivo="coleta encerrada sem nenhum quadro",
+            )
+
+        await self._session.commit()
+        return removed
 
     async def resplit(self, dataset_id: int) -> ResplitResult:
         """Refaz a partição a partir de `raw/`, no estado em que `raw/` está agora.

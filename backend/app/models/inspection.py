@@ -5,11 +5,11 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, TimestampMixin
+from app.models.base import Base, SourceMixin, TimestampMixin
 from app.models.enums import InspectionStatus, NoteStatus
 
 
-class Inspection(Base, TimestampMixin):
+class Inspection(Base, SourceMixin, TimestampMixin):
     __tablename__ = "inspections"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -59,7 +59,7 @@ class Damage(Base):
     inspection: Mapped[Inspection] = relationship(back_populates="damages")
 
 
-class SapNote(Base, TimestampMixin):
+class SapNote(Base, SourceMixin, TimestampMixin):
     """Nota SAP aberta a partir de uma inspeção."""
 
     __tablename__ = "sap_notes"
@@ -77,7 +77,7 @@ class SapNote(Base, TimestampMixin):
     inspection: Mapped[Inspection] = relationship(back_populates="notes")
 
 
-class ModelMetric(Base, TimestampMixin):
+class ModelMetric(Base, SourceMixin, TimestampMixin):
     """Métricas publicadas pela equipe de visão computacional (MAPE, mAP, …).
 
     Este projeto não treina o modelo — apenas registra e exibe o que a outra

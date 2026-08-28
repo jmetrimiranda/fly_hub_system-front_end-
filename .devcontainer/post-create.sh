@@ -8,7 +8,7 @@ if [ ! -f .env ]; then
   echo "  .env criado a partir de .env.example — preencha as credenciais."
 fi
 
-mkdir -p data/datasets data/models
+mkdir -p data/datasets models
 
 # O repositório é bind mount vindo do host; sem isto o git recusa a pasta.
 git config --global --add safe.directory "$(pwd)" || true
@@ -29,7 +29,11 @@ fi
 echo "▸ Aplicando migrations…"
 alembic upgrade head
 
-echo "▸ Populando dados de demonstração…"
+# Ambiente novo não pode abrir vazio e parecer quebrado — mas também não pode
+# passar por dado real. O seed grava tudo com `source="seed"`, a interface
+# mostra o selo "demonstração" e o comando abaixo desfaz.
+echo "▸ Populando dados de DEMONSTRAÇÃO (não são coletas reais)…"
+echo "  Para removê-los depois: python -m app.db.seed --clear"
 python -m app.db.seed || true
 
 cat <<'MSG'
@@ -43,5 +47,10 @@ cat <<'MSG'
     Frontend        http://localhost:5173
     API + Swagger   http://localhost:8000/docs
     Documentação    make docs  →  http://localhost:8001
+
+  Os datasets e inspeções já visíveis são DEMONSTRAÇÃO, marcados com selo na
+  tela. Quando as coletas reais começarem, remova-os:
+
+    python -m app.db.seed --clear        (ou o botão em Datasets)
 
 MSG

@@ -91,12 +91,40 @@ por arquivo, do componente React até a persistência.
 cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 cd backend && pytest -q
 cd backend && alembic revision --autogenerate -m "descrição"
+cd backend && python -m app.db.seed --clear            # tira a demonstração
+cd backend && python -m app.db.maintenance prune-empty # coletas sem imagem
 cd frontend && npm run lint && npm test
 ```
 
 Docker sempre pela raiz do repositório, o que restringe ao projeto `flyhub`.
 **Nunca** `docker stop`/`docker rm` por nome nem `docker system prune` — a
 máquina tem containers de outros projetos rodando.
+
+## Entrega do modelo
+
+Uma pessoa **só** treina e entrega o `.pt`. Ela não edita código, não edita
+configuração e não roda migration. O fluxo dela é: treina em
+`notebooks/treino-yolo.ipynb` → copia `best.pt` e `metrics.json` para `models/`
+→ confere o badge na tela Voo → commita o notebook (os pesos vão para o
+`.gitignore`) → `develop` → `release` → `main`.
+
+**Se um passo exigir mexer na aplicação, o desenho falhou** — corrija o desenho,
+não acrescente instrução. Não existe endpoint de upload nem reinício: o vigia em
+`services/model_service.py` percebe o arquivo, lê o `metrics.json`, grava em
+`model_metrics` e publica `model.changed`.
+
+Toggle e reload são ações **distintas**: `toggle` liga e desliga a inferência
+mantendo os pesos em memória, `reload` relê o disco. Juntá-las impediria
+comparar detecção ligada e desligada no mesmo voo. O toggle é persistido em
+`app_settings` — reiniciar não religa o que foi desligado de propósito.
+
+## Demonstração versus voo
+
+Toda linha de `datasets`, `inspections`, `model_metrics` e `sap_notes` carrega
+`source` (`seed` | `collected`), gravado no INSERT. Nunca deduza a origem por
+data, id ou padrão de nome. `python -m app.db.seed --clear` e
+`DELETE /api/v1/admin/seed` compartilham a mesma regra, em
+`services/demo_data_service.py`.
 
 ## Ambiente
 

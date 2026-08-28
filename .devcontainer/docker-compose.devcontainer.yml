@@ -21,6 +21,10 @@ services:
       # Repositório irmão, somente leitura: é referência para a migração,
       # não algo a ser editado daqui.
       - ../flyhub_connecting:/workspaces/flyhub_connecting:ro
+      # Repetido do compose da raiz de propósito: o caminho `/models` precisa
+      # existir igual nos dois modos de subir. Quem edita um e esquece o outro
+      # descobre pelo badge dizendo "sem modelo" com o arquivo em disco.
+      - ./models:/models
       - claude-config:/home/flyhub/.claude
     mem_limit: 3g
 

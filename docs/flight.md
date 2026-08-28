@@ -162,17 +162,52 @@ coleta é criar o dataset para treinar o primeiro modelo. São três estados, e 
 tela sempre diz em qual está, porque ver vídeo cru achando que são detecções
 reais é pior do que não ver nada:
 
-| `model_loaded` | `model_error` | Badge |
-| --- | --- | --- |
-| `true` | `null` | `MODELO best.pt` (verde) |
-| `false` | `null` | `SEM MODELO — vídeo cru` (amarelo) |
-| `false` | texto | `MODELO NÃO CARREGOU — vídeo cru` (vermelho) |
+| `model_loaded` | `model_enabled` | `model_error` | Badge |
+| --- | --- | --- | --- |
+| `true` | `true` | `null` | `MODELO best.pt` (verde) |
+| `true` | `false` | `null` | `MODELO DESLIGADO — vídeo cru` (amarelo) |
+| `false` | — | `null` | `SEM MODELO — vídeo cru` (amarelo) |
+| `false` | — | texto | `MODELO NÃO CARREGOU — vídeo cru` (vermelho) |
+
+As três últimas linhas produzem a **mesma imagem** — vídeo cru, nenhuma caixa —
+por três causas diferentes. Por isso o badge nunca fica em silêncio: ver vídeo
+cru achando que o modelo não detectou nada é pior que não ver vídeo.
 
 `ultralytics` é importado **dentro** da função de carga, nunca no topo do
 módulo: ele arrasta torch (~2,5 GB) e a aplicação precisa subir sem ele. Por
 isso ele mora em `backend/requirements-vision.txt`, separado. Os pesos são
 recarregados sozinhos quando o arquivo muda — o operador copia o `best.pt` para
 `MODELS_DIR` com a aplicação no ar e a tela muda de estado em segundos.
+
+### O modelo: entrega, toggle e vigia
+
+Quem treina copia dois arquivos para `models/` (montada como `/models`) e não
+faz mais nada. A cadeia que sustenta essa promessa:
+
+| Peça | Arquivo | Responsabilidade |
+| --- | --- | --- |
+| `Detector` | `integrations/vision/detector.py` | carrega, infere, relê por `mtime`, lê o `metrics.json` ao lado |
+| `ModelService` | `services/model_service.py` | traduz o estado para a tela, persiste o toggle, grava as métricas |
+| `watch()` | `services/model_service.py` | percebe o arquivo novo e publica `model.changed` |
+| Rotas | `api/v1/routes/model.py` | `GET /model`, `POST /model/toggle`, `POST /model/reload` |
+| `useModel` | `frontend/src/hooks/useModel.ts` | consulta e mutações; o SSE invalida |
+| `ModelPanel` | `frontend/src/components/model/ModelPanel.tsx` | toggle, recarregar, métricas |
+
+O **vigia** não é redundância do hot-reload do `Detector`: aquele acontece
+dentro de `detect()`, e com ninguém assistindo ao vídeo `detect()` não é
+chamado. Sem o laço, a pessoa copiaria o `best.pt` e a tela continuaria dizendo
+"sem modelo" até alguém abrir o stream.
+
+**Toggle e reload são ações distintas.** `toggle` liga e desliga a inferência
+mantendo os pesos em memória; `reload` relê o disco. Juntá-las impediria
+comparar detecção ligada e desligada no mesmo voo — o primeiro teste que se faz
+ao receber um modelo novo — e cada alternância pagaria de novo o custo da carga.
+
+O estado do toggle vive em `app_settings`, não em memória: reiniciar o backend
+não pode religar sozinho um modelo que o operador desligou de propósito.
+
+O passo a passo para quem só treina está em
+[Onde colocar o peso do modelo](modelo/index.md).
 
 ### A tabela CONEXÃO
 
@@ -415,7 +450,7 @@ ou um `curl` chegam na mesma rota.
 Liga e desliga o consumo do stream pelo modelo. Este projeto **não executa** a
 inferência — comanda o processo que a outra equipe entrega e reporta o estado.
 
-Quando não há arquivo de pesos em `/data/models/best.pt`, a aplicação roda em
+Quando não há arquivo de pesos em `/models/best.pt`, a aplicação roda em
 passthrough: o vídeo passa intacto e nada é detectado. A interface diz isso com
 todas as letras em vez de mostrar um estado vazio ambíguo.
 

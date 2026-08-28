@@ -53,7 +53,11 @@ markdown_extensions:
 
 nav:
   - Início: index.md
-  - Como executar: ../starting_aplication.md
+  - Executar:
+      - Como rodar: rodar/index.md
+      - Fluxo de branches: rodar/branches.md
+  - Modelo:
+      - Onde colocar o peso: modelo/index.md
   - Arquitetura:
       - Visão geral: architecture.md
       - Modelo de dados: data-model.md

@@ -31,7 +31,15 @@ const INVALIDATION_MAP: Record<string, readonly (readonly unknown[])[]> = {
   "collection.resumed": [keys.flight.collection()],
   "collection.saved": [keys.flight.collection(), keys.flight.preflight(), keys.datasets.all],
   "collection.cancelled": [keys.flight.collection(), keys.flight.preflight()],
+  // Coleta que não gravou quadro nenhum: o backend apaga pasta e registro e o
+  // número da versão volta a ficar livre. `preflight` carrega `next_version`,
+  // então sem invalidá-la o modal seguinte ofereceria o número errado.
+  "collection.discarded": [keys.flight.collection(), keys.flight.preflight(), keys.datasets.all],
   "pipeline.status": [keys.flight.pipeline()],
+  // Alguém copiou um best.pt para models/, ou ligou/desligou a inferência. O
+  // badge sobre o vídeo sai de `flight.status`, e o painel do modelo da sua
+  // própria chave — os dois precisam saber.
+  "model.changed": [keys.model.all, keys.flight.status(), keys.flight.pipeline()],
   "roboflow.started": [keys.datasets.all],
   "roboflow.progress": [keys.datasets.all],
   "roboflow.finished": [keys.datasets.all],
