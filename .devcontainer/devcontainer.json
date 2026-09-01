@@ -10,7 +10,7 @@
 
   // `docs` fica de fora: em 8 GB ele não paga o próprio custo.
   // Suba sob demanda com `make docs`.
-  "runServices": ["db", "backend", "frontend"],
+  "runServices": ["db", "backend", "frontend", "mediamtx"],
   "shutdownAction": "stopCompose",
 
   // Claude Code recusa --dangerously-skip-permissions rodando como root.

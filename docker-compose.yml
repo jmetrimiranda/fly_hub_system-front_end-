@@ -121,11 +121,17 @@ services:
       MTX_PROTOCOLS: tcp
       MTX_API: "yes"
       MTX_APIADDRESS: ":9997"
+      MTX_AUTHINTERNALUSERS_0_USER: any
+      MTX_AUTHINTERNALUSERS_0_IPS: ""
+      MTX_AUTHINTERNALUSERS_0_PERMISSIONS_0_ACTION: api
+      MTX_AUTHINTERNALUSERS_0_PERMISSIONS_1_ACTION: publish
+      MTX_AUTHINTERNALUSERS_0_PERMISSIONS_2_ACTION: read
+      MTX_AUTHINTERNALUSERS_0_PERMISSIONS_3_ACTION: playback
+      MTX_AUTHINTERNALUSERS_0_PERMISSIONS_4_ACTION: metrics
     ports:
       - "1935:1935"   # RTMP  (publicação vinda do FlightHub)
       - "8554:8554"   # RTSP  (consumo pelo backend)
       - "9997:9997"   # API de status
-    profiles: ["stream"]
 
 volumes:
   pgdata:
